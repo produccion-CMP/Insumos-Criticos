@@ -1,281 +1,645 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro GMP</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    <style>
-        :root { --bg: #121212; --text: #e0e0e0; --primary: #007bff; --danger: #dc3545; --surface: #1e1e1e; }
-        body { font-family: system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        .screen { display: none; max-width: 500px; margin: 0 auto; background: var(--surface); padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .active { display: block; }
-        input, select, button { width: 100%; box-sizing: border-box; margin-bottom: 15px; padding: 12px; border-radius: 4px; border: 1px solid #333; background: #2c2c2c; color: var(--text); }
-        button { background-color: var(--primary); border: none; cursor: pointer; font-weight: bold; }
-        button:hover { filter: brightness(1.1); }
-        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
-        .btn-group button { margin-bottom: 0; background: #444; }
-        .error { color: var(--danger); font-size: 0.9em; margin-bottom: 10px; display: none; }
-        #loader { display: none; text-align: center; margin-top: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GMP Insumos</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0d6efd">
+  
+  <!-- Google Fonts, FontAwesome & SweetAlert2 -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    :root {
+      --primary: #0d6efd;
+      --secondary: #198754;
+      --accent: #fd7e14;
+      --bg-gradient: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      --surface: #ffffff;
+      --text-main: #2b3a4a;
+      --text-sec: #6c757d;
+      --radius: 20px;
+      --shadow: 0 8px 30px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; font-family: 'Nunito', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animaciones */
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.9); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 30px 24px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .screen.active { 
+      display: flex; 
+      animation: slideInRight 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; 
+    }
+
+    /* Cabecera */
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .btn-back {
+      background: var(--surface);
+      border: none;
+      width: 45px; height: 45px;
+      border-radius: 50%;
+      font-size: 20px;
+      color: var(--text-main);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      cursor: pointer;
+      margin-right: 16px;
+      transition: transform 0.2s;
+    }
+    .btn-back:active { transform: scale(0.9); }
+    .title { font-size: 24px; font-weight: 800; color: var(--text-main); }
+
+    /* Tarjetas de Botón */
+    .card-btn {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+    .card-btn:active { transform: translateY(2px) scale(0.98); }
+    .card-btn i { font-size: 32px; width: 50px; text-align: center; margin-right: 15px; color: var(--primary); transition: transform 0.3s;}
+    .card-btn:hover i { transform: scale(1.1); }
+    .card-btn.green i { color: var(--secondary); }
+    .card-btn.orange i { color: var(--accent); }
+    .card-btn span { font-size: 18px; font-weight: 700; }
+
+    /* Botón Principal */
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 18px;
+      font-size: 18px;
+      font-weight: 800;
+      width: 100%;
+      cursor: pointer;
+      margin-top: auto;
+      box-shadow: 0 8px 20px rgba(13, 110, 253, 0.3);
+      transition: all 0.2s;
+      display: flex; justify-content: center; align-items: center; gap: 10px;
+    }
+    .btn-primary:active { transform: scale(0.96); box-shadow: 0 4px 10px rgba(13, 110, 253, 0.2); }
+
+    /* Formularios */
+    .input-group { margin-bottom: 24px; animation: popIn 0.5s ease forwards; }
+    .input-group label { display: block; margin-bottom: 10px; font-weight: 700; color: var(--text-sec); font-size: 15px;}
+    .input-group input, .input-group select {
+      width: 100%;
+      padding: 18px;
+      border: 2px solid #e2e8f0;
+      border-radius: 14px;
+      font-size: 18px;
+      background: var(--surface);
+      outline: none;
+      transition: all 0.3s;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .input-group input:focus, .input-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(13,110,253,0.1); }
+    
+    /* Sugerencias de cantidad */
+    .quick-qty-container { display: flex; gap: 12px; margin-bottom: 20px; }
+    .btn-qty {
+      flex: 1; padding: 14px 0; background: var(--surface);
+      border: 2px solid var(--primary); color: var(--primary);
+      border-radius: 12px; font-size: 18px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 10px rgba(13,110,253,0.1);
+    }
+    .btn-qty:active { background: var(--primary); color: white; transform: scale(0.95); }
+
+    /* Foto UI */
+    .file-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
+    .file-wrapper input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+    #preview-container { text-align: center; margin-top: 20px; display: none; animation: popIn 0.4s ease; }
+    #preview-img { max-width: 100%; max-height: 300px; border-radius: 16px; box-shadow: var(--shadow); object-fit: cover;}
+
+    /* Spinner Loading */
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.95); z-index: 9999;
+      display: none; justify-content: center; align-items: center; flex-direction: column;
+    }
+    .loader {
+      width: 60px; height: 60px;
+      border: 6px solid #e2e8f0; border-bottom-color: var(--primary);
+      border-radius: 50%; display: inline-block;
+      animation: rotation 1s linear infinite; margin-bottom: 20px;
+    }
+    @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Resumen / Revisión */
+    .review-card {
+      background: var(--surface); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 24px;
+    }
+    .review-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #e2e8f0; }
+    .review-item:last-child { border-bottom: none; }
+    .review-item span:first-child { color: var(--text-sec); font-weight: 600; }
+    .review-item span:last-child { font-weight: 800; color: var(--text-main); text-align: right; }
+  </style>
 </head>
 <body>
 
-    <!-- Login -->
-    <div id="login-screen" class="screen active">
-        <h2>Acceso Operativo</h2>
-        <input type="password" id="pwd" placeholder="Contraseña">
-        <div id="login-error" class="error">Contraseña incorrecta</div>
-        <button onclick="login()">Ingresar</button>
+  <!-- LOADING OVERLAY -->
+  <div id="loading" class="overlay">
+    <span class="loader"></span>
+    <h2 style="color: var(--text-main); font-weight: 800;" id="loading-text">Procesando...</h2>
+    <p style="color: var(--text-sec); margin-top: 8px;">Por favor espera un momento</p>
+  </div>
+
+  <!-- SCREEN 0: LOGIN -->
+  <div id="screen-login" class="screen active" style="justify-content: center; align-items: center; text-align: center;">
+    <div style="background: white; padding: 30px; border-radius: 50%; box-shadow: var(--shadow); margin-bottom: 30px; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center;">
+      <img src="https://cdn-icons-png.flaticon.com/512/2760/2760995.png" alt="Logo" style="width: 70px;">
+    </div>
+    <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 10px;">GMP Insumos</h1>
+    <p style="color: var(--text-sec); margin-bottom: 40px; font-size: 16px;">Sistema de control logístico</p>
+    
+    <div class="input-group" style="width: 100%;">
+      <input type="password" id="pass" placeholder="Ingresa tu contraseña" style="text-align: center; letter-spacing: 2px;">
+    </div>
+    <button class="btn-primary" onclick="login()">Ingresar <i class="fa-solid fa-arrow-right"></i></button>
+  </div>
+
+  <!-- SCREEN 1: MENU -->
+  <div id="screen-menu" class="screen">
+    <div class="header">
+      <div>
+        <h1 class="title">¿Qué deseas registrar?</h1>
+        <p style="color: var(--text-sec); margin-top: 4px;">Selecciona el tipo de movimiento</p>
+      </div>
+    </div>
+    <div class="card-btn" onclick="setMovimiento('Ingreso')">
+      <i class="fa-solid fa-arrow-right-to-bracket"></i><span>Registrar Ingreso</span>
+    </div>
+    <div class="card-btn" onclick="setMovimiento('Envío')">
+      <i class="fa-solid fa-truck-fast"></i><span>Registrar Envío</span>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: TIPO -->
+  <div id="screen-tipo" class="screen">
+    <div class="header">
+      <button class="btn-back" onclick="nav('screen-menu')"><i class="fa-solid fa-chevron-left"></i></button>
+      <h1 class="title">Selecciona el insumo</h1>
+    </div>
+    <div class="card-btn orange" onclick="setTipo('Tarimas')">
+      <i class="fa-solid fa-pallet"></i><span>Tarimas</span>
+    </div>
+    <div class="card-btn green" onclick="setTipo('Stretch')">
+      <i class="fa-solid fa-box-archive"></i><span>Film Stretch</span>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: FOTO -->
+  <div id="screen-foto" class="screen">
+    <div class="header">
+      <button class="btn-back" onclick="nav('screen-tipo')"><i class="fa-solid fa-chevron-left"></i></button>
+      <h1 class="title">Evidencia</h1>
+    </div>
+    <p style="margin-bottom: 24px; color: var(--text-sec); font-size: 16px;">Adjunta el remito físico. Es un paso obligatorio.</p>
+    
+    <div class="file-wrapper">
+      <div class="card-btn"><i class="fa-solid fa-camera"></i><span>Tomar Fotografía</span></div>
+      <input type="file" accept="image/*" capture="environment" id="file-cam" onchange="handleFile(this)">
+    </div>
+    
+    <div class="file-wrapper">
+      <div class="card-btn"><i class="fa-regular fa-image"></i><span>Elegir de Galería</span></div>
+      <input type="file" accept="image/*,application/pdf" id="file-gal" onchange="handleFile(this)">
     </div>
 
-    <!-- Menú Principal -->
-    <div id="menu-screen" class="screen">
-        <h2>Tipo de Operación</h2>
-        <button onclick="setOperacion('Ingreso')">Ingreso</button>
-        <button onclick="setOperacion('Envío')">Envío</button>
+    <div id="preview-container">
+      <img id="preview-img" src="" alt="Vista Previa">
+      <p id="preview-name" style="margin-top: 10px; color: var(--text-sec); font-weight: 600;"></p>
     </div>
 
-    <!-- Tipo de Insumo -->
-    <div id="type-screen" class="screen">
-        <h2>Insumo (<span id="lbl-operacion"></span>)</h2>
-        <button onclick="setTipo('Tarimas')">Tarimas</button>
-        <button onclick="setTipo('Stretch')">Stretch</button>
-        <button style="background:var(--danger)" onclick="nav('menu-screen')">Volver</button>
+    <button class="btn-primary" onclick="validarFoto()" style="margin-top: auto;">Continuar <i class="fa-solid fa-arrow-right"></i></button>
+  </div>
+
+  <!-- SCREEN 4: PROVEEDOR -->
+  <div id="screen-proveedor" class="screen">
+    <div class="header">
+      <button class="btn-back" onclick="nav('screen-foto')"><i class="fa-solid fa-chevron-left"></i></button>
+      <h1 class="title">Proveedor</h1>
+    </div>
+    
+    <div id="prov-tarimas" style="display: none;">
+      <div class="card-btn" onclick="setProvDropdown('Tucumán Pallet / Chivilisco')"><i class="fa-solid fa-industry"></i><span>Tucumán Pallet / Chivilisco</span></div>
+      <div class="card-btn" onclick="setProvDirecto('Gianni')"><i class="fa-solid fa-user-tie"></i><span>Gianni</span></div>
+      <div class="card-btn" onclick="setProvDropdown('Otro')"><i class="fa-solid fa-list-ul"></i><span>Otro Proveedor</span></div>
     </div>
 
-    <!-- Formulario -->
-    <div id="form-screen" class="screen">
-        <h2>Registro: <span id="lbl-tipo"></span></h2>
+    <div id="prov-stretch" style="display: none;">
+      <div class="card-btn" onclick="setProvDirecto('Urflex')"><i class="fa-solid fa-box-open"></i><span>Urflex</span></div>
+      <div class="card-btn" onclick="setProvDropdown('Otro')"><i class="fa-solid fa-plus-circle"></i><span>Otro / Nuevo Proveedor</span></div>
+    </div>
+
+    <div id="prov-dropdown-area" style="display:none; margin-top: 20px; background: var(--surface); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow);">
+      <div class="input-group">
+        <label>Selecciona de la lista</label>
+        <select id="prov-select" onchange="checkNuevoProv()"></select>
+      </div>
+      <div class="input-group" id="div-nuevo-prov" style="display: none;">
+        <label>Nombre del Nuevo Proveedor</label>
+        <input type="text" id="nuevo-prov" placeholder="Ej: Plásticos del Norte SA">
+      </div>
+      <button class="btn-primary" onclick="confirmarProvDropdown()" style="padding: 14px;">Confirmar</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: CANTIDAD -->
+  <div id="screen-cantidad" class="screen">
+    <div class="header">
+      <button class="btn-back" onclick="backToProv()"><i class="fa-solid fa-chevron-left"></i></button>
+      <h1 class="title">Cantidades</h1>
+    </div>
+    
+    <div class="input-group">
+      <label id="lbl-cantidad">Cantidad</label>
+      <input type="number" step="0.01" id="val-cantidad" placeholder="0.00" style="font-size: 24px; font-weight: 800; text-align: center;">
+    </div>
+
+    <!-- Sugerencias -->
+    <div id="div-sugerencias">
+      <label style="display: block; margin-bottom: 12px; font-weight: 700; color: var(--text-sec); font-size: 14px;">Histórico frecuente:</label>
+      <div class="quick-qty-container" id="btn-sugerencias"></div>
+    </div>
+
+    <div class="input-group" id="div-bobinas" style="display: none; margin-top: 20px;">
+      <label>Cantidad [Bobinas] (Opcional)</label>
+      <input type="number" step="0.01" id="val-bobinas" placeholder="0" style="text-align: center;">
+    </div>
+
+    <button class="btn-primary" onclick="validarCantidad()" style="margin-top: auto;">Continuar <i class="fa-solid fa-arrow-right"></i></button>
+  </div>
+
+  <!-- SCREEN 6: REMITO -->
+  <div id="screen-remito" class="screen">
+    <div class="header">
+      <button class="btn-back" onclick="nav('screen-cantidad')"><i class="fa-solid fa-chevron-left"></i></button>
+      <h1 class="title">Nº de Remito</h1>
+    </div>
+    
+    <div class="input-group">
+      <label>Identificador del documento</label>
+      <input type="text" id="val-remito" placeholder="Ej: 0001-00123456" style="font-size: 20px; font-weight: 700; text-align: center;">
+      <div id="remito-hint" style="color: var(--accent); margin-top: 10px; font-weight: 700; font-size: 14px; text-align: center;"></div>
+    </div>
+
+    <button class="btn-primary" onclick="validarRemito()" style="margin-top: auto;">Continuar <i class="fa-solid fa-arrow-right"></i></button>
+  </div>
+
+  <!-- SCREEN 7: DETALLES -->
+  <div id="screen-detalles" class="screen">
+    <div class="header">
+      <button class="btn-back" onclick="nav('screen-remito')"><i class="fa-solid fa-chevron-left"></i></button>
+      <h1 class="title">Datos Finales</h1>
+    </div>
+    
+    <div class="input-group">
+      <label>Fecha de Operación</label>
+      <input type="date" id="val-fecha">
+    </div>
+    <div class="input-group">
+      <label>Observaciones (Opcional)</label>
+      <input type="text" id="val-obs" placeholder="Algún comentario relevante...">
+    </div>
+
+    <button class="btn-primary" onclick="irARevision()" style="margin-top: auto;">Generar Resumen <i class="fa-solid fa-check-double"></i></button>
+  </div>
+
+  <!-- SCREEN 8: REVISION -->
+  <div id="screen-revision" class="screen">
+    <div class="header">
+      <button class="btn-back" onclick="nav('screen-detalles')"><i class="fa-solid fa-chevron-left"></i></button>
+      <h1 class="title">Resumen</h1>
+    </div>
+    
+    <div class="review-card">
+      <div class="review-item"><span>Operación</span> <span id="rev-mov" style="color: var(--primary);"></span></div>
+      <div class="review-item"><span>Insumo</span> <span id="rev-tipo"></span></div>
+      <div class="review-item"><span>Proveedor</span> <span id="rev-prov"></span></div>
+      <div class="review-item"><span>Cantidad</span> <span id="rev-cant" style="font-size: 1.2em; color: var(--secondary);"></span></div>
+      <div class="review-item" id="li-rev-bob" style="display:none;"><span>Bobinas</span> <span id="rev-bob"></span></div>
+      <div class="review-item"><span>Remito Nº</span> <span id="rev-remito"></span></div>
+      <div class="review-item"><span>Fecha</span> <span id="rev-fecha"></span></div>
+    </div>
+
+    <button class="btn-primary" onclick="guardarMovimiento()" style="background: var(--secondary); margin-top: auto;">
+      Confirmar y Guardar <i class="fa-solid fa-cloud-arrow-up"></i>
+    </button>
+  </div>
+
+  <script>
+    // --- ESTADO DE LA APLICACIÓN ---
+    let state = {
+      pass: '', movimiento: '', tipo: '', fotoBase64: null, fileName: '',
+      proveedor: '', cantidad: '', cantBobinas: '', remito: '', fecha: '', obs: '',
+      listas: { tarimas: [], stretch: [] }
+    };
+
+    // --- FUNCIONES UI/UX ---
+    function nav(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+    
+    function showLoading(text) {
+      document.getElementById('loading-text').innerText = text;
+      document.getElementById('loading').style.display = 'flex';
+    }
+    function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+
+    function showAlert(title, text, icon = 'error') {
+      Swal.fire({ title, text, icon, confirmButtonColor: '#0d6efd', borderRadius: '20px' });
+    }
+
+    // --- FLUJO DE PANTALLAS ---
+    function login() {
+      const p = document.getElementById('pass').value;
+      if(p === 'GMP2026') { state.pass = p; nav('screen-menu'); } 
+      else { showAlert('Error de Acceso', 'La contraseña es incorrecta.', 'error'); }
+    }
+
+    function setMovimiento(mov) {
+      state.movimiento = mov;
+      nav('screen-tipo');
+    }
+
+    function setTipo(tipo) {
+      state.tipo = tipo;
+      if (state.movimiento === 'Envío') {
+        state.proveedor = 'Envío';
+        nav('screen-foto');
+      } else {
+        nav('screen-foto');
+      }
+    }
+
+    // --- PROCESAMIENTO DE FOTO ---
+    function handleFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      
+      const isPDF = file.type === 'application/pdf';
+      state.fileName = file.name;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        state.fotoBase64 = e.target.result;
+        document.getElementById('preview-container').style.display = 'block';
+        if(isPDF) {
+          document.getElementById('preview-img').src = 'https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg';
+        } else {
+          document.getElementById('preview-img').src = state.fotoBase64;
+        }
+        document.getElementById('preview-name').innerText = file.name;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function validarFoto() {
+      if(!state.fotoBase64) { showAlert("Atención", "Debes adjuntar la foto o PDF del remito para continuar.", "warning"); return; }
+      if(state.movimiento === 'Envío') prepararCantidad();
+      else armarPantallaProveedor();
+    }
+
+    // --- LÓGICA DE PROVEEDOR ---
+    function armarPantallaProveedor() {
+      document.getElementById('prov-tarimas').style.display = state.tipo === 'Tarimas' ? 'block' : 'none';
+      document.getElementById('prov-stretch').style.display = state.tipo === 'Stretch' ? 'block' : 'none';
+      document.getElementById('prov-dropdown-area').style.display = 'none';
+      
+      if(state.listas.tarimas.length === 0) {
+        showLoading("Sincronizando proveedores...");
+        google.script.run.withSuccessHandler(res => {
+          state.listas = res;
+          hideLoading();
+          nav('screen-proveedor');
+        }).getProveedores();
+      } else {
+        nav('screen-proveedor');
+      }
+    }
+
+    function setProvDirecto(prov) {
+      state.proveedor = prov;
+      prepararCantidad();
+    }
+
+    function setProvDropdown(categoria) {
+      const sel = document.getElementById('prov-select');
+      sel.innerHTML = '<option value="">Seleccione un proveedor...</option>';
+      let opciones = [];
+      
+      if(state.tipo === 'Tarimas') {
+        if(categoria === 'Tucumán Pallet / Chivilisco') {
+          opciones = state.listas.tarimas.filter(p => p.includes("Tucumán Pallet") || p.includes("Chivilisco"));
+        } else {
+          opciones = state.listas.tarimas.filter(p => !p.includes("Tucumán Pallet") && !p.includes("Chivilisco") && p !== "Gianni" && p !== "Envío");
+        }
+      } else {
+        opciones = state.listas.stretch.filter(p => p !== "Urflex" && p !== "Envío");
+        opciones.push("++ NUEVO PROVEEDOR ++");
+      }
+
+      opciones.forEach(o => sel.innerHTML += `<option value="${o}">${o}</option>`);
+      document.getElementById('prov-dropdown-area').style.display = 'block';
+      
+      // Scroll suave hacia el dropdown
+      setTimeout(() => document.getElementById('prov-dropdown-area').scrollIntoView({ behavior: 'smooth' }), 100);
+      checkNuevoProv();
+    }
+
+    function checkNuevoProv() {
+      const isNuevo = document.getElementById('prov-select').value === "++ NUEVO PROVEEDOR ++";
+      document.getElementById('div-nuevo-prov').style.display = isNuevo ? 'block' : 'none';
+    }
+
+    function confirmarProvDropdown() {
+      const val = document.getElementById('prov-select').value;
+      if(!val) { showAlert("Faltan datos", "Por favor seleccione un proveedor.", "warning"); return; }
+      
+      if(val === "++ NUEVO PROVEEDOR ++") {
+        const nuevo = document.getElementById('nuevo-prov').value.trim();
+        if(!nuevo) { showAlert("Faltan datos", "Escriba el nombre del nuevo proveedor.", "warning"); return; }
         
-        <label>Foto de Remito (Obligatorio)</label>
-        <input type="file" id="file" accept="image/*,application/pdf" capture="environment">
-        <button type="button" onclick="extraerOCR()" style="background:#28a745">Extraer datos (OCR - Solo Imágenes)</button>
-        <div id="ocr-result" style="font-size: 0.8em; color: #aaa; margin-bottom: 10px;"></div>
-
-        <label>Proveedor</label>
-        <select id="proveedor" onchange="checkNuevoProveedor()"></select>
-        <input type="text" id="nuevo-proveedor" placeholder="Nombre del nuevo proveedor" style="display:none;">
-
-        <label id="lbl-cantidad">Cantidad</label>
-        <div class="btn-group" id="frequent-btns">
-            <!-- Valores frecuentes inyectados por JS -->
-        </div>
-        <input type="number" id="cantidad" placeholder="Ingreso manual" required>
-
-        <div id="bobinas-container" style="display:none;">
-            <label>Cantidad Stretch [Bob.]</label>
-            <input type="number" id="bobinas" placeholder="Opcional">
-        </div>
-
-        <label>Número de Remito</label>
-        <input type="text" id="remito" required>
-
-        <label>Fecha</label>
-        <input type="date" id="fecha">
-
-        <label>Observaciones</label>
-        <input type="text" id="obs" placeholder="Opcional">
-
-        <div id="form-error" class="error"></div>
-        <button onclick="submitForm()">Revisar y Guardar</button>
-        <button style="background:var(--danger)" onclick="nav('type-screen')">Volver</button>
-        <div id="loader">Procesando...</div>
-    </div>
-
-    <script>
-        // CONFIGURACIÓN: REEMPLAZAR CON LA URL DE GOOGLE APPS SCRIPT
-        const GAS_URL = 'TU_URL_DE_WEB_APP'; 
-        
-        let appState = { action: '', type: '', providers: {}, remitos: {}, fileBase64: null, mimeType: '', fileName: '' };
-
-        // Inicialización de fecha actual
-        document.getElementById('fecha').valueAsDate = new Date();
-
-        function nav(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-        }
-
-        function login() {
-            if (document.getElementById('pwd').value === 'GMP2026') {
-                document.getElementById('login-error').style.display = 'none';
-                fetchData();
-                nav('menu-screen');
-            } else {
-                document.getElementById('login-error').style.display = 'block';
-            }
-        }
-
-        function setOperacion(op) {
-            appState.action = op;
-            document.getElementById('lbl-operacion').textContent = op;
-            nav('type-screen');
-        }
-
-        function setTipo(tipo) {
-            appState.type = tipo;
-            document.getElementById('lbl-tipo').textContent = `${appState.action} de ${tipo}`;
-            setupForm();
-            nav('form-screen');
-        }
-
-        async function fetchData() {
-            try {
-                const response = await fetch(GAS_URL);
-                const data = await response.json();
-                appState.providers = { Tarimas: data.proveedoresTarimas, Stretch: data.proveedoresStretch };
-                appState.remitos = { Tarimas: data.lastRemitoTarimas, Stretch: data.lastRemitoStretch };
-            } catch (e) {
-                console.error("Error obteniendo configuración base", e);
-            }
-        }
-
-        function setupForm() {
-            const selectProv = document.getElementById('proveedor');
-            selectProv.innerHTML = '';
-            
-            const providersList = appState.providers[appState.type] || [];
-            providersList.forEach(p => {
-                selectProv.add(new Option(p, p));
-            });
-
-            if (appState.action === 'Envío') {
-                selectProv.innerHTML = '<option value="Envío">Envío</option>';
-            } else if (appState.type === 'Stretch') {
-                selectProv.add(new Option('+ Añadir nuevo proveedor...', 'NEW'));
-            }
-
-            document.getElementById('remito').value = appState.remitos[appState.type] || '';
-            document.getElementById('bobinas-container').style.display = appState.type === 'Stretch' ? 'block' : 'none';
-            document.getElementById('lbl-cantidad').textContent = appState.type === 'Stretch' ? 'Cantidad [Kg]' : 'Cantidad';
-            
-            setupFrequentButtons();
-            checkNuevoProveedor();
-        }
-
-        function checkNuevoProveedor() {
-            const isNew = document.getElementById('proveedor').value === 'NEW';
-            document.getElementById('nuevo-proveedor').style.display = isNew ? 'block' : 'none';
-        }
-
-        function setupFrequentButtons() {
-            const container = document.getElementById('frequent-btns');
-            container.innerHTML = '';
-            // Valores frecuentes harcodeados genéricos (el cálculo dinámico encarece el doGet en Sheets)
-            const freqs = appState.type === 'Tarimas' ? [50, 100, 200] : [100, 250, 500];
-            freqs.forEach(val => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.textContent = val;
-                btn.onclick = () => document.getElementById('cantidad').value = val;
-                container.appendChild(btn);
-            });
-        }
-
-        async function extraerOCR() {
-            const fileInput = document.getElementById('file');
-            if (!fileInput.files.length) return alert('Seleccione una foto primero.');
-            const file = fileInput.files[0];
-            
-            if (file.type === 'application/pdf') {
-                alert('El OCR cliente no soporta PDF. Ingrese los datos manualmente.');
-                return;
-            }
-
-            document.getElementById('ocr-result').textContent = 'Procesando imagen (esto puede demorar)...';
-            try {
-                const result = await Tesseract.recognize(file, 'spa');
-                const text = result.data.text;
-                document.getElementById('ocr-result').textContent = 'Análisis completo. Revise el remito.';
-                
-                // Intento heurístico de encontrar un número de remito en el texto
-                const remitoMatch = text.match(/\b(?:Nº|N°|Remito|Factura)[\s:-]*(\d{1,4}-\d{1,8}|\d{3,8})\b/i);
-                if (remitoMatch) document.getElementById('remito').value = remitoMatch[1].replace('-', '');
-                
-            } catch (err) {
-                document.getElementById('ocr-result').textContent = 'Error en OCR.';
-            }
-        }
-
-        document.getElementById('file').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                appState.fileBase64 = event.target.result;
-                appState.mimeType = file.type;
-                appState.fileName = file.name;
-            };
-            reader.readAsDataURL(file);
+        Swal.fire({
+          title: '¿Crear proveedor?',
+          text: `Se agregará "${nuevo}" a la base de datos de Stretch.`,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, crear',
+          cancelButtonText: 'Cancelar'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            state.proveedor = nuevo;
+            showLoading("Registrando proveedor...");
+            google.script.run.withSuccessHandler(() => {
+              state.listas.stretch.push(nuevo);
+              hideLoading();
+              prepararCantidad();
+            }).agregarProveedorStretch(nuevo);
+          }
         });
+      } else {
+        state.proveedor = val;
+        prepararCantidad();
+      }
+    }
 
-        async function submitForm() {
-            const errorDiv = document.getElementById('form-error');
-            errorDiv.style.display = 'none';
-            const cantidad = document.getElementById('cantidad').value;
-            const remito = document.getElementById('remito').value;
-            let prov = document.getElementById('proveedor').value;
-            const isNuevoProv = prov === 'NEW';
-            if (isNuevoProv) prov = document.getElementById('nuevo-proveedor').value;
+    function backToProv() {
+      if(state.movimiento === 'Envío') nav('screen-foto');
+      else nav('screen-proveedor');
+    }
 
-            if (!cantidad || !remito || !appState.fileBase64) {
-                errorDiv.textContent = 'Cantidad, Remito y Foto son obligatorios.';
-                errorDiv.style.display = 'block';
-                return;
-            }
+    // --- CANTIDAD Y REMITO ---
+    function prepararCantidad() {
+      document.getElementById('val-cantidad').value = '';
+      document.getElementById('val-bobinas').value = '';
+      document.getElementById('lbl-cantidad').innerText = state.tipo === 'Tarimas' ? 'Cantidad de Tarimas' : 'Cantidad de Stretch [Kg]';
+      document.getElementById('div-bobinas').style.display = state.tipo === 'Stretch' ? 'block' : 'none';
 
-            // Validaciones de formato frontend
-            if (appState.type === 'Tarimas') {
-                if (prov === 'Gianni' && !/^\d{6}$/.test(remito)) {
-                    errorDiv.textContent = 'Remito Gianni debe tener exactamente 6 dígitos.';
-                    errorDiv.style.display = 'block'; return;
-                }
-                if ((prov === 'Tucumán Pallet' || prov === 'Chivilisco') && !/^\d{1,4}$/.test(remito)) {
-                    errorDiv.textContent = 'Remito Tucumán Pallet/Chivilisco debe tener entre 1 y 4 dígitos.';
-                    errorDiv.style.display = 'block'; return;
-                }
-            }
-
-            const payload = {
-                password: document.getElementById('pwd').value,
-                tipo: appState.type,
-                action: appState.action,
-                proveedor: prov,
-                nuevoProveedor: isNuevoProv,
-                cantidad: parseFloat(cantidad),
-                bobinas: document.getElementById('bobinas').value ? parseFloat(document.getElementById('bobinas').value) : null,
-                remito: remito,
-                fecha: document.getElementById('fecha').value,
-                obs: document.getElementById('obs').value,
-                fileBase64: appState.fileBase64,
-                mimeType: appState.mimeType,
-                fileName: appState.fileName
-            };
-
-            document.getElementById('loader').style.display = 'block';
-            
-            try {
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert('Registro guardado exitosamente.');
-                    location.reload();
-                } else {
-                    throw new Error(result.error);
-                }
-            } catch (err) {
-                errorDiv.textContent = 'Error: ' + err.message;
-                errorDiv.style.display = 'block';
-            } finally {
-                document.getElementById('loader').style.display = 'none';
-            }
+      showLoading("Analizando historial...");
+      google.script.run.withSuccessHandler(res => {
+        hideLoading();
+        
+        const divSugs = document.getElementById('btn-sugerencias');
+        divSugs.innerHTML = '';
+        if(res.cantidadesTop.length > 0) {
+          res.cantidadesTop.forEach(c => { divSugs.innerHTML += `<button class="btn-qty" onclick="usarCant(${c})">${c}</button>`; });
+          document.getElementById('btn-sugerencias').style.display = 'flex';
+        } else {
+          divSugs.innerHTML = '<span style="color:var(--text-sec); font-size:14px;">No hay registros previos para calcular sugerencias.</span>';
         }
-    </script>
+
+        document.getElementById('val-remito').value = res.remitoSugerido;
+        nav('screen-cantidad');
+      }).getDatosPrecarga(state.tipo, state.proveedor);
+    }
+
+    function usarCant(val) { document.getElementById('val-cantidad').value = val; }
+
+    function validarCantidad() {
+      const c = parseFloat(document.getElementById('val-cantidad').value);
+      if(!c || c <= 0) { showAlert("Inválido", "Ingrese una cantidad numérica mayor a 0.", "error"); return; }
+      state.cantidad = c;
+      if(state.tipo === 'Stretch') state.cantBobinas = parseFloat(document.getElementById('val-bobinas').value) || '';
+      
+      let hint = "";
+      if(state.movimiento === 'Ingreso' && state.tipo === 'Tarimas') {
+        if(state.proveedor === 'Gianni') hint = "<i class='fa-solid fa-circle-exclamation'></i> Requiere exactamente 6 dígitos.";
+        else if(state.proveedor.includes('Tucumán Pallet') || state.proveedor.includes('Chivilisco')) hint = "<i class='fa-solid fa-circle-exclamation'></i> Requiere entre 1 y 4 dígitos.";
+      }
+      document.getElementById('remito-hint').innerHTML = hint;
+
+      nav('screen-remito');
+    }
+
+    function validarRemito() {
+      const r = document.getElementById('val-remito').value.trim();
+      if(!r) { showAlert("Requerido", "El número de remito es obligatorio.", "warning"); return; }
+
+      if(state.movimiento === 'Ingreso' && state.tipo === 'Tarimas') {
+        if(state.proveedor === 'Gianni' && !/^\d{6}$/.test(r)) {
+          showAlert("Formato Incorrecto", "Para Gianni, el remito debe contener exactamente 6 números.", "error"); return;
+        }
+        if((state.proveedor.includes('Tucumán Pallet') || state.proveedor.includes('Chivilisco')) && !/^\d{1,4}$/.test(r)) {
+          showAlert("Formato Incorrecto", "Para este proveedor, el remito debe contener de 1 a 4 números.", "error"); return;
+        }
+      }
+      state.remito = r;
+      document.getElementById('val-fecha').valueAsDate = new Date();
+      document.getElementById('val-obs').value = '';
+      nav('screen-detalles');
+    }
+
+    // --- REVISIÓN Y GUARDADO ---
+    function irARevision() {
+      const f = document.getElementById('val-fecha').value;
+      if(!f) { showAlert("Requerido", "Seleccione la fecha del movimiento.", "warning"); return; }
+      state.fecha = f;
+      state.obs = document.getElementById('val-obs').value.trim();
+
+      document.getElementById('rev-mov').innerText = state.movimiento.toUpperCase();
+      document.getElementById('rev-tipo').innerText = state.tipo;
+      document.getElementById('rev-prov').innerText = state.proveedor;
+      document.getElementById('rev-cant').innerText = state.cantidad + (state.tipo==='Stretch'?' Kg':' Ud.');
+      
+      if(state.tipo === 'Stretch' && state.cantBobinas) {
+        document.getElementById('li-rev-bob').style.display = 'flex';
+        document.getElementById('rev-bob').innerText = state.cantBobinas + ' Bob.';
+      } else {
+        document.getElementById('li-rev-bob').style.display = 'none';
+      }
+
+      document.getElementById('rev-remito').innerText = state.remito;
+      document.getElementById('rev-fecha').innerText = state.fecha;
+
+      nav('screen-revision');
+    }
+
+    function guardarMovimiento() {
+      showLoading("Procesando en el servidor...");
+      google.script.run.withSuccessHandler(res => {
+        hideLoading();
+        if(res.exito) {
+          Swal.fire({
+            title: '¡Operación Exitosa!',
+            text: res.mensaje,
+            icon: 'success',
+            confirmButtonColor: '#198754'
+          }).then(() => {
+            // Reset y volver al menú
+            state.fotoBase64 = null;
+            document.getElementById('preview-container').style.display = 'none';
+            document.getElementById('file-cam').value = '';
+            document.getElementById('file-gal').value = '';
+            nav('screen-menu');
+          });
+        } else {
+          showAlert("Error de Servidor", res.mensaje, "error");
+        }
+      }).procesarCarga(state);
+    }
+  </script>
 </body>
 </html>
