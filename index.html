@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro GMP</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <style>
+        :root { --bg: #121212; --text: #e0e0e0; --primary: #007bff; --danger: #dc3545; --surface: #1e1e1e; }
+        body { font-family: system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .screen { display: none; max-width: 500px; margin: 0 auto; background: var(--surface); padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .active { display: block; }
+        input, select, button { width: 100%; box-sizing: border-box; margin-bottom: 15px; padding: 12px; border-radius: 4px; border: 1px solid #333; background: #2c2c2c; color: var(--text); }
+        button { background-color: var(--primary); border: none; cursor: pointer; font-weight: bold; }
+        button:hover { filter: brightness(1.1); }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-group button { margin-bottom: 0; background: #444; }
+        .error { color: var(--danger); font-size: 0.9em; margin-bottom: 10px; display: none; }
+        #loader { display: none; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- Login -->
+    <div id="login-screen" class="screen active">
+        <h2>Acceso Operativo</h2>
+        <input type="password" id="pwd" placeholder="Contraseña">
+        <div id="login-error" class="error">Contraseña incorrecta</div>
+        <button onclick="login()">Ingresar</button>
+    </div>
+
+    <!-- Menú Principal -->
+    <div id="menu-screen" class="screen">
+        <h2>Tipo de Operación</h2>
+        <button onclick="setOperacion('Ingreso')">Ingreso</button>
+        <button onclick="setOperacion('Envío')">Envío</button>
+    </div>
+
+    <!-- Tipo de Insumo -->
+    <div id="type-screen" class="screen">
+        <h2>Insumo (<span id="lbl-operacion"></span>)</h2>
+        <button onclick="setTipo('Tarimas')">Tarimas</button>
+        <button onclick="setTipo('Stretch')">Stretch</button>
+        <button style="background:var(--danger)" onclick="nav('menu-screen')">Volver</button>
+    </div>
+
+    <!-- Formulario -->
+    <div id="form-screen" class="screen">
+        <h2>Registro: <span id="lbl-tipo"></span></h2>
+        
+        <label>Foto de Remito (Obligatorio)</label>
+        <input type="file" id="file" accept="image/*,application/pdf" capture="environment">
+        <button type="button" onclick="extraerOCR()" style="background:#28a745">Extraer datos (OCR - Solo Imágenes)</button>
+        <div id="ocr-result" style="font-size: 0.8em; color: #aaa; margin-bottom: 10px;"></div>
+
+        <label>Proveedor</label>
+        <select id="proveedor" onchange="checkNuevoProveedor()"></select>
+        <input type="text" id="nuevo-proveedor" placeholder="Nombre del nuevo proveedor" style="display:none;">
+
+        <label id="lbl-cantidad">Cantidad</label>
+        <div class="btn-group" id="frequent-btns">
+            <!-- Valores frecuentes inyectados por JS -->
+        </div>
+        <input type="number" id="cantidad" placeholder="Ingreso manual" required>
+
+        <div id="bobinas-container" style="display:none;">
+            <label>Cantidad Stretch [Bob.]</label>
+            <input type="number" id="bobinas" placeholder="Opcional">
+        </div>
+
+        <label>Número de Remito</label>
+        <input type="text" id="remito" required>
+
+        <label>Fecha</label>
+        <input type="date" id="fecha">
+
+        <label>Observaciones</label>
+        <input type="text" id="obs" placeholder="Opcional">
+
+        <div id="form-error" class="error"></div>
+        <button onclick="submitForm()">Revisar y Guardar</button>
+        <button style="background:var(--danger)" onclick="nav('type-screen')">Volver</button>
+        <div id="loader">Procesando...</div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN: REEMPLAZAR CON LA URL DE GOOGLE APPS SCRIPT
+        const GAS_URL = 'TU_URL_DE_WEB_APP'; 
+        
+        let appState = { action: '', type: '', providers: {}, remitos: {}, fileBase64: null, mimeType: '', fileName: '' };
+
+        // Inicialización de fecha actual
+        document.getElementById('fecha').valueAsDate = new Date();
+
+        function nav(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function login() {
+            if (document.getElementById('pwd').value === 'GMP2026') {
+                document.getElementById('login-error').style.display = 'none';
+                fetchData();
+                nav('menu-screen');
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        function setOperacion(op) {
+            appState.action = op;
+            document.getElementById('lbl-operacion').textContent = op;
+            nav('type-screen');
+        }
+
+        function setTipo(tipo) {
+            appState.type = tipo;
+            document.getElementById('lbl-tipo').textContent = `${appState.action} de ${tipo}`;
+            setupForm();
+            nav('form-screen');
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(GAS_URL);
+                const data = await response.json();
+                appState.providers = { Tarimas: data.proveedoresTarimas, Stretch: data.proveedoresStretch };
+                appState.remitos = { Tarimas: data.lastRemitoTarimas, Stretch: data.lastRemitoStretch };
+            } catch (e) {
+                console.error("Error obteniendo configuración base", e);
+            }
+        }
+
+        function setupForm() {
+            const selectProv = document.getElementById('proveedor');
+            selectProv.innerHTML = '';
+            
+            const providersList = appState.providers[appState.type] || [];
+            providersList.forEach(p => {
+                selectProv.add(new Option(p, p));
+            });
+
+            if (appState.action === 'Envío') {
+                selectProv.innerHTML = '<option value="Envío">Envío</option>';
+            } else if (appState.type === 'Stretch') {
+                selectProv.add(new Option('+ Añadir nuevo proveedor...', 'NEW'));
+            }
+
+            document.getElementById('remito').value = appState.remitos[appState.type] || '';
+            document.getElementById('bobinas-container').style.display = appState.type === 'Stretch' ? 'block' : 'none';
+            document.getElementById('lbl-cantidad').textContent = appState.type === 'Stretch' ? 'Cantidad [Kg]' : 'Cantidad';
+            
+            setupFrequentButtons();
+            checkNuevoProveedor();
+        }
+
+        function checkNuevoProveedor() {
+            const isNew = document.getElementById('proveedor').value === 'NEW';
+            document.getElementById('nuevo-proveedor').style.display = isNew ? 'block' : 'none';
+        }
+
+        function setupFrequentButtons() {
+            const container = document.getElementById('frequent-btns');
+            container.innerHTML = '';
+            // Valores frecuentes harcodeados genéricos (el cálculo dinámico encarece el doGet en Sheets)
+            const freqs = appState.type === 'Tarimas' ? [50, 100, 200] : [100, 250, 500];
+            freqs.forEach(val => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = val;
+                btn.onclick = () => document.getElementById('cantidad').value = val;
+                container.appendChild(btn);
+            });
+        }
+
+        async function extraerOCR() {
+            const fileInput = document.getElementById('file');
+            if (!fileInput.files.length) return alert('Seleccione una foto primero.');
+            const file = fileInput.files[0];
+            
+            if (file.type === 'application/pdf') {
+                alert('El OCR cliente no soporta PDF. Ingrese los datos manualmente.');
+                return;
+            }
+
+            document.getElementById('ocr-result').textContent = 'Procesando imagen (esto puede demorar)...';
+            try {
+                const result = await Tesseract.recognize(file, 'spa');
+                const text = result.data.text;
+                document.getElementById('ocr-result').textContent = 'Análisis completo. Revise el remito.';
+                
+                // Intento heurístico de encontrar un número de remito en el texto
+                const remitoMatch = text.match(/\b(?:Nº|N°|Remito|Factura)[\s:-]*(\d{1,4}-\d{1,8}|\d{3,8})\b/i);
+                if (remitoMatch) document.getElementById('remito').value = remitoMatch[1].replace('-', '');
+                
+            } catch (err) {
+                document.getElementById('ocr-result').textContent = 'Error en OCR.';
+            }
+        }
+
+        document.getElementById('file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                appState.fileBase64 = event.target.result;
+                appState.mimeType = file.type;
+                appState.fileName = file.name;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        async function submitForm() {
+            const errorDiv = document.getElementById('form-error');
+            errorDiv.style.display = 'none';
+            const cantidad = document.getElementById('cantidad').value;
+            const remito = document.getElementById('remito').value;
+            let prov = document.getElementById('proveedor').value;
+            const isNuevoProv = prov === 'NEW';
+            if (isNuevoProv) prov = document.getElementById('nuevo-proveedor').value;
+
+            if (!cantidad || !remito || !appState.fileBase64) {
+                errorDiv.textContent = 'Cantidad, Remito y Foto son obligatorios.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            // Validaciones de formato frontend
+            if (appState.type === 'Tarimas') {
+                if (prov === 'Gianni' && !/^\d{6}$/.test(remito)) {
+                    errorDiv.textContent = 'Remito Gianni debe tener exactamente 6 dígitos.';
+                    errorDiv.style.display = 'block'; return;
+                }
+                if ((prov === 'Tucumán Pallet' || prov === 'Chivilisco') && !/^\d{1,4}$/.test(remito)) {
+                    errorDiv.textContent = 'Remito Tucumán Pallet/Chivilisco debe tener entre 1 y 4 dígitos.';
+                    errorDiv.style.display = 'block'; return;
+                }
+            }
+
+            const payload = {
+                password: document.getElementById('pwd').value,
+                tipo: appState.type,
+                action: appState.action,
+                proveedor: prov,
+                nuevoProveedor: isNuevoProv,
+                cantidad: parseFloat(cantidad),
+                bobinas: document.getElementById('bobinas').value ? parseFloat(document.getElementById('bobinas').value) : null,
+                remito: remito,
+                fecha: document.getElementById('fecha').value,
+                obs: document.getElementById('obs').value,
+                fileBase64: appState.fileBase64,
+                mimeType: appState.mimeType,
+                fileName: appState.fileName
+            };
+
+            document.getElementById('loader').style.display = 'block';
+            
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Registro guardado exitosamente.');
+                    location.reload();
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (err) {
+                errorDiv.textContent = 'Error: ' + err.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
