@@ -2,643 +2,264 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GMP Insumos</title>
-  
-  <!-- PWA Meta Tags -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#0d6efd">
-  
-  <!-- Google Fonts, FontAwesome & SweetAlert2 -->
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
   <style>
-    :root {
-      --primary: #0d6efd;
-      --secondary: #198754;
-      --accent: #fd7e14;
-      --bg-gradient: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-      --surface: #ffffff;
-      --text-main: #2b3a4a;
-      --text-sec: #6c757d;
-      --radius: 20px;
-      --shadow: 0 8px 30px rgba(0,0,0,0.08);
-    }
-
-    * { box-sizing: border-box; font-family: 'Nunito', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    /* Estilos minimalistas y de alto contraste para entorno industrial */
+    body { font-family: Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+    .screen { display: none; max-width: 400px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .screen.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
-    body {
-      background: var(--bg-gradient);
-      color: var(--text-main);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Animaciones */
-    @keyframes slideInRight {
-      from { opacity: 0; transform: translateX(30px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    @keyframes popIn {
-      0% { opacity: 0; transform: scale(0.9); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-
-    .screen {
-      display: none;
-      flex-direction: column;
-      min-height: 100vh;
-      padding: 30px 24px;
-      max-width: 500px;
-      margin: 0 auto;
-    }
-    .screen.active { 
-      display: flex; 
-      animation: slideInRight 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; 
-    }
-
-    /* Cabecera */
-    .header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-    .btn-back {
-      background: var(--surface);
-      border: none;
-      width: 45px; height: 45px;
-      border-radius: 50%;
-      font-size: 20px;
-      color: var(--text-main);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-      cursor: pointer;
-      margin-right: 16px;
-      transition: transform 0.2s;
-    }
-    .btn-back:active { transform: scale(0.9); }
-    .title { font-size: 24px; font-weight: 800; color: var(--text-main); }
-
-    /* Tarjetas de Botón */
-    .card-btn {
-      background: var(--surface);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      box-shadow: var(--shadow);
-      cursor: pointer;
-      transition: all 0.3s ease;
-      border: 2px solid transparent;
-    }
-    .card-btn:active { transform: translateY(2px) scale(0.98); }
-    .card-btn i { font-size: 32px; width: 50px; text-align: center; margin-right: 15px; color: var(--primary); transition: transform 0.3s;}
-    .card-btn:hover i { transform: scale(1.1); }
-    .card-btn.green i { color: var(--secondary); }
-    .card-btn.orange i { color: var(--accent); }
-    .card-btn span { font-size: 18px; font-weight: 700; }
-
-    /* Botón Principal */
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 14px;
-      padding: 18px;
-      font-size: 18px;
-      font-weight: 800;
-      width: 100%;
-      cursor: pointer;
-      margin-top: auto;
-      box-shadow: 0 8px 20px rgba(13, 110, 253, 0.3);
-      transition: all 0.2s;
-      display: flex; justify-content: center; align-items: center; gap: 10px;
-    }
-    .btn-primary:active { transform: scale(0.96); box-shadow: 0 4px 10px rgba(13, 110, 253, 0.2); }
-
-    /* Formularios */
-    .input-group { margin-bottom: 24px; animation: popIn 0.5s ease forwards; }
-    .input-group label { display: block; margin-bottom: 10px; font-weight: 700; color: var(--text-sec); font-size: 15px;}
-    .input-group input, .input-group select {
-      width: 100%;
-      padding: 18px;
-      border: 2px solid #e2e8f0;
-      border-radius: 14px;
-      font-size: 18px;
-      background: var(--surface);
-      outline: none;
-      transition: all 0.3s;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .input-group input:focus, .input-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(13,110,253,0.1); }
+    h2 { text-align: center; margin-top: 0; color: #0056b3; }
+    .btn { display: block; width: 100%; padding: 15px; margin-bottom: 10px; border: none; border-radius: 5px; font-size: 18px; font-weight: bold; cursor: pointer; text-align: center; transition: background 0.2s; }
+    .btn-primary { background-color: #0056b3; color: white; }
+    .btn-primary:active { background-color: #004494; }
+    .btn-secondary { background-color: #e2e8f0; color: #333; }
+    .btn-secondary:active { background-color: #cbd5e1; }
+    .btn-success { background-color: #28a745; color: white; }
     
-    /* Sugerencias de cantidad */
-    .quick-qty-container { display: flex; gap: 12px; margin-bottom: 20px; }
-    .btn-qty {
-      flex: 1; padding: 14px 0; background: var(--surface);
-      border: 2px solid var(--primary); color: var(--primary);
-      border-radius: 12px; font-size: 18px; font-weight: 800;
-      cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 10px rgba(13,110,253,0.1);
-    }
-    .btn-qty:active { background: var(--primary); color: white; transform: scale(0.95); }
-
-    /* Foto UI */
-    .file-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
-    .file-wrapper input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-    #preview-container { text-align: center; margin-top: 20px; display: none; animation: popIn 0.4s ease; }
-    #preview-img { max-width: 100%; max-height: 300px; border-radius: 16px; box-shadow: var(--shadow); object-fit: cover;}
-
-    /* Spinner Loading */
-    .overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255,255,255,0.95); z-index: 9999;
-      display: none; justify-content: center; align-items: center; flex-direction: column;
-    }
-    .loader {
-      width: 60px; height: 60px;
-      border: 6px solid #e2e8f0; border-bottom-color: var(--primary);
-      border-radius: 50%; display: inline-block;
-      animation: rotation 1s linear infinite; margin-bottom: 20px;
-    }
-    @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    /* Resumen / Revisión */
-    .review-card {
-      background: var(--surface); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 24px;
-    }
-    .review-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #e2e8f0; }
-    .review-item:last-child { border-bottom: none; }
-    .review-item span:first-child { color: var(--text-sec); font-weight: 600; }
-    .review-item span:last-child { font-weight: 800; color: var(--text-main); text-align: right; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+    input[type="text"], input[type="password"], input[type="number"], input[type="date"] { width: 100%; padding: 15px; margin-bottom: 15px; border: 2px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
+    
+    .hidden { display: none; }
+    #loader { display: none; text-align: center; font-weight: bold; color: #0056b3; padding: 20px; }
+    img.preview { max-width: 100%; height: auto; border-radius: 5px; margin-bottom: 15px; display: none; }
   </style>
 </head>
 <body>
 
-  <!-- LOADING OVERLAY -->
-  <div id="loading" class="overlay">
-    <span class="loader"></span>
-    <h2 style="color: var(--text-main); font-weight: 800;" id="loading-text">Procesando...</h2>
-    <p style="color: var(--text-sec); margin-top: 8px;">Por favor espera un momento</p>
+  <div id="loader">Conectando con el servidor...</div>
+
+  <!-- LOGIN -->
+  <div id="s-login" class="screen active">
+    <h2>Acceso</h2>
+    <input type="password" id="pass" placeholder="Contraseña">
+    <button class="btn btn-primary" onclick="login()">Ingresar</button>
   </div>
 
-  <!-- SCREEN 0: LOGIN -->
-  <div id="screen-login" class="screen active" style="justify-content: center; align-items: center; text-align: center;">
-    <div style="background: white; padding: 30px; border-radius: 50%; box-shadow: var(--shadow); margin-bottom: 30px; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center;">
-      <img src="https://cdn-icons-png.flaticon.com/512/2760/2760995.png" alt="Logo" style="width: 70px;">
+  <!-- MOVIMIENTO -->
+  <div id="s-movimiento" class="screen">
+    <h2>Tipo de Operación</h2>
+    <button class="btn btn-secondary" onclick="setMovimiento('Ingreso')">📥 Ingreso</button>
+    <button class="btn btn-secondary" onclick="setMovimiento('Envío')">📤 Envío</button>
+  </div>
+
+  <!-- INSUMO -->
+  <div id="s-tipo" class="screen">
+    <h2>Insumo</h2>
+    <button class="btn btn-secondary" onclick="setTipo('Tarimas')">🟫 Tarimas</button>
+    <button class="btn btn-secondary" onclick="setTipo('Stretch')">🌀 Stretch</button>
+  </div>
+
+  <!-- FOTO -->
+  <div id="s-foto" class="screen">
+    <h2>Evidencia</h2>
+    <input type="file" id="inputFile" accept="image/*" capture="environment" style="display:none;" onchange="previewFile()">
+    <button class="btn btn-secondary" onclick="document.getElementById('inputFile').click()">📸 Abrir Cámara / Galería</button>
+    <img id="imgPreview" class="preview">
+    <button class="btn btn-primary hidden" id="btnSiguienteFoto" onclick="validarFoto()">Continuar</button>
+  </div>
+
+  <!-- PROVEEDOR -->
+  <div id="s-proveedor" class="screen">
+    <h2>Proveedor</h2>
+    <div id="provTarimasBtns" class="hidden">
+      <button class="btn btn-secondary" onclick="setProv('Tucumán Pallet')">Tucumán Pallet</button>
+      <button class="btn btn-secondary" onclick="setProv('Gianni')">Gianni</button>
+      <button class="btn btn-secondary" onclick="mostrarOtroProv()">Otro...</button>
     </div>
-    <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 10px;">GMP Insumos</h1>
-    <p style="color: var(--text-sec); margin-bottom: 40px; font-size: 16px;">Sistema de control logístico</p>
+    <div id="provStretchBtns" class="hidden">
+      <button class="btn btn-secondary" onclick="setProv('Urflex')">Urflex</button>
+      <button class="btn btn-secondary" onclick="mostrarOtroProv()">Otro...</button>
+    </div>
+    <div id="divOtroProv" class="hidden">
+      <input type="text" id="inputOtroProv" placeholder="Escriba el proveedor">
+      <button class="btn btn-primary" onclick="setProv(document.getElementById('inputOtroProv').value)">Aceptar</button>
+    </div>
+  </div>
+
+  <!-- CANTIDAD -->
+  <div id="s-cantidad" class="screen">
+    <h2>Cantidad</h2>
     
-    <div class="input-group" style="width: 100%;">
-      <input type="password" id="pass" placeholder="Ingresa tu contraseña" style="text-align: center; letter-spacing: 2px;">
+    <!-- Botones rápidos solicitados para Tarimas -->
+    <div id="botonesTarimas" class="grid-2 hidden">
+      <button class="btn btn-secondary" onclick="setCant(500)">500</button>
+      <button class="btn btn-secondary" onclick="setCant(600)">600</button>
+      <button class="btn btn-secondary" onclick="setCant(1400)">1400</button>
+      <button class="btn btn-secondary" onclick="mostrarManualCant()">Otro</button>
     </div>
-    <button class="btn-primary" onclick="login()">Ingresar <i class="fa-solid fa-arrow-right"></i></button>
-  </div>
 
-  <!-- SCREEN 1: MENU -->
-  <div id="screen-menu" class="screen">
-    <div class="header">
-      <div>
-        <h1 class="title">¿Qué deseas registrar?</h1>
-        <p style="color: var(--text-sec); margin-top: 4px;">Selecciona el tipo de movimiento</p>
-      </div>
-    </div>
-    <div class="card-btn" onclick="setMovimiento('Ingreso')">
-      <i class="fa-solid fa-arrow-right-to-bracket"></i><span>Registrar Ingreso</span>
-    </div>
-    <div class="card-btn" onclick="setMovimiento('Envío')">
-      <i class="fa-solid fa-truck-fast"></i><span>Registrar Envío</span>
+    <!-- Entrada manual (para Stretch o para "Otro" en Tarimas) -->
+    <div id="divCantManual" class="hidden">
+      <input type="number" id="inputCant" placeholder="Cantidad (Kg o Unidades)">
+      <input type="number" id="inputBobinas" class="hidden" placeholder="Cantidad Bobinas (Opcional)">
+      <button class="btn btn-primary" onclick="guardarCantManual()">Continuar</button>
     </div>
   </div>
 
-  <!-- SCREEN 2: TIPO -->
-  <div id="screen-tipo" class="screen">
-    <div class="header">
-      <button class="btn-back" onclick="nav('screen-menu')"><i class="fa-solid fa-chevron-left"></i></button>
-      <h1 class="title">Selecciona el insumo</h1>
-    </div>
-    <div class="card-btn orange" onclick="setTipo('Tarimas')">
-      <i class="fa-solid fa-pallet"></i><span>Tarimas</span>
-    </div>
-    <div class="card-btn green" onclick="setTipo('Stretch')">
-      <i class="fa-solid fa-box-archive"></i><span>Film Stretch</span>
-    </div>
-  </div>
-
-  <!-- SCREEN 3: FOTO -->
-  <div id="screen-foto" class="screen">
-    <div class="header">
-      <button class="btn-back" onclick="nav('screen-tipo')"><i class="fa-solid fa-chevron-left"></i></button>
-      <h1 class="title">Evidencia</h1>
-    </div>
-    <p style="margin-bottom: 24px; color: var(--text-sec); font-size: 16px;">Adjunta el remito físico. Es un paso obligatorio.</p>
-    
-    <div class="file-wrapper">
-      <div class="card-btn"><i class="fa-solid fa-camera"></i><span>Tomar Fotografía</span></div>
-      <input type="file" accept="image/*" capture="environment" id="file-cam" onchange="handleFile(this)">
-    </div>
-    
-    <div class="file-wrapper">
-      <div class="card-btn"><i class="fa-regular fa-image"></i><span>Elegir de Galería</span></div>
-      <input type="file" accept="image/*,application/pdf" id="file-gal" onchange="handleFile(this)">
-    </div>
-
-    <div id="preview-container">
-      <img id="preview-img" src="" alt="Vista Previa">
-      <p id="preview-name" style="margin-top: 10px; color: var(--text-sec); font-weight: 600;"></p>
-    </div>
-
-    <button class="btn-primary" onclick="validarFoto()" style="margin-top: auto;">Continuar <i class="fa-solid fa-arrow-right"></i></button>
-  </div>
-
-  <!-- SCREEN 4: PROVEEDOR -->
-  <div id="screen-proveedor" class="screen">
-    <div class="header">
-      <button class="btn-back" onclick="nav('screen-foto')"><i class="fa-solid fa-chevron-left"></i></button>
-      <h1 class="title">Proveedor</h1>
-    </div>
-    
-    <div id="prov-tarimas" style="display: none;">
-      <div class="card-btn" onclick="setProvDropdown('Tucumán Pallet / Chivilisco')"><i class="fa-solid fa-industry"></i><span>Tucumán Pallet / Chivilisco</span></div>
-      <div class="card-btn" onclick="setProvDirecto('Gianni')"><i class="fa-solid fa-user-tie"></i><span>Gianni</span></div>
-      <div class="card-btn" onclick="setProvDropdown('Otro')"><i class="fa-solid fa-list-ul"></i><span>Otro Proveedor</span></div>
-    </div>
-
-    <div id="prov-stretch" style="display: none;">
-      <div class="card-btn" onclick="setProvDirecto('Urflex')"><i class="fa-solid fa-box-open"></i><span>Urflex</span></div>
-      <div class="card-btn" onclick="setProvDropdown('Otro')"><i class="fa-solid fa-plus-circle"></i><span>Otro / Nuevo Proveedor</span></div>
-    </div>
-
-    <div id="prov-dropdown-area" style="display:none; margin-top: 20px; background: var(--surface); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow);">
-      <div class="input-group">
-        <label>Selecciona de la lista</label>
-        <select id="prov-select" onchange="checkNuevoProv()"></select>
-      </div>
-      <div class="input-group" id="div-nuevo-prov" style="display: none;">
-        <label>Nombre del Nuevo Proveedor</label>
-        <input type="text" id="nuevo-prov" placeholder="Ej: Plásticos del Norte SA">
-      </div>
-      <button class="btn-primary" onclick="confirmarProvDropdown()" style="padding: 14px;">Confirmar</button>
-    </div>
-  </div>
-
-  <!-- SCREEN 5: CANTIDAD -->
-  <div id="screen-cantidad" class="screen">
-    <div class="header">
-      <button class="btn-back" onclick="backToProv()"><i class="fa-solid fa-chevron-left"></i></button>
-      <h1 class="title">Cantidades</h1>
-    </div>
-    
-    <div class="input-group">
-      <label id="lbl-cantidad">Cantidad</label>
-      <input type="number" step="0.01" id="val-cantidad" placeholder="0.00" style="font-size: 24px; font-weight: 800; text-align: center;">
-    </div>
-
-    <!-- Sugerencias -->
-    <div id="div-sugerencias">
-      <label style="display: block; margin-bottom: 12px; font-weight: 700; color: var(--text-sec); font-size: 14px;">Histórico frecuente:</label>
-      <div class="quick-qty-container" id="btn-sugerencias"></div>
-    </div>
-
-    <div class="input-group" id="div-bobinas" style="display: none; margin-top: 20px;">
-      <label>Cantidad [Bobinas] (Opcional)</label>
-      <input type="number" step="0.01" id="val-bobinas" placeholder="0" style="text-align: center;">
-    </div>
-
-    <button class="btn-primary" onclick="validarCantidad()" style="margin-top: auto;">Continuar <i class="fa-solid fa-arrow-right"></i></button>
-  </div>
-
-  <!-- SCREEN 6: REMITO -->
-  <div id="screen-remito" class="screen">
-    <div class="header">
-      <button class="btn-back" onclick="nav('screen-cantidad')"><i class="fa-solid fa-chevron-left"></i></button>
-      <h1 class="title">Nº de Remito</h1>
-    </div>
-    
-    <div class="input-group">
-      <label>Identificador del documento</label>
-      <input type="text" id="val-remito" placeholder="Ej: 0001-00123456" style="font-size: 20px; font-weight: 700; text-align: center;">
-      <div id="remito-hint" style="color: var(--accent); margin-top: 10px; font-weight: 700; font-size: 14px; text-align: center;"></div>
-    </div>
-
-    <button class="btn-primary" onclick="validarRemito()" style="margin-top: auto;">Continuar <i class="fa-solid fa-arrow-right"></i></button>
-  </div>
-
-  <!-- SCREEN 7: DETALLES -->
-  <div id="screen-detalles" class="screen">
-    <div class="header">
-      <button class="btn-back" onclick="nav('screen-remito')"><i class="fa-solid fa-chevron-left"></i></button>
-      <h1 class="title">Datos Finales</h1>
-    </div>
-    
-    <div class="input-group">
-      <label>Fecha de Operación</label>
-      <input type="date" id="val-fecha">
-    </div>
-    <div class="input-group">
-      <label>Observaciones (Opcional)</label>
-      <input type="text" id="val-obs" placeholder="Algún comentario relevante...">
-    </div>
-
-    <button class="btn-primary" onclick="irARevision()" style="margin-top: auto;">Generar Resumen <i class="fa-solid fa-check-double"></i></button>
-  </div>
-
-  <!-- SCREEN 8: REVISION -->
-  <div id="screen-revision" class="screen">
-    <div class="header">
-      <button class="btn-back" onclick="nav('screen-detalles')"><i class="fa-solid fa-chevron-left"></i></button>
-      <h1 class="title">Resumen</h1>
-    </div>
-    
-    <div class="review-card">
-      <div class="review-item"><span>Operación</span> <span id="rev-mov" style="color: var(--primary);"></span></div>
-      <div class="review-item"><span>Insumo</span> <span id="rev-tipo"></span></div>
-      <div class="review-item"><span>Proveedor</span> <span id="rev-prov"></span></div>
-      <div class="review-item"><span>Cantidad</span> <span id="rev-cant" style="font-size: 1.2em; color: var(--secondary);"></span></div>
-      <div class="review-item" id="li-rev-bob" style="display:none;"><span>Bobinas</span> <span id="rev-bob"></span></div>
-      <div class="review-item"><span>Remito Nº</span> <span id="rev-remito"></span></div>
-      <div class="review-item"><span>Fecha</span> <span id="rev-fecha"></span></div>
-    </div>
-
-    <button class="btn-primary" onclick="guardarMovimiento()" style="background: var(--secondary); margin-top: auto;">
-      Confirmar y Guardar <i class="fa-solid fa-cloud-arrow-up"></i>
-    </button>
+  <!-- REMITO Y FECHA -->
+  <div id="s-detalles" class="screen">
+    <h2>Detalles</h2>
+    <input type="text" id="valRemito" placeholder="Nº Remito">
+    <input type="date" id="valFecha">
+    <input type="text" id="valObs" placeholder="Observaciones (Opcional)">
+    <button class="btn btn-success" onclick="enviarDatos()">Guardar Registro</button>
   </div>
 
   <script>
-    // --- ESTADO DE LA APLICACIÓN ---
-    let state = {
-      pass: '', movimiento: '', tipo: '', fotoBase64: null, fileName: '',
-      proveedor: '', cantidad: '', cantBobinas: '', remito: '', fecha: '', obs: '',
-      listas: { tarimas: [], stretch: [] }
+    // ⚠️ REEMPLAZAR POR LA URL DE APPS SCRIPT
+    const API_URL = "AQUI_LA_URL_DE_TU_WEB_APP"; 
+
+    let db = { 
+      password: '', movimiento: '', tipo: '', proveedor: '', cantidad: '', 
+      cantBobinas: '', fotoBase64: '', fileName: '', remito: '', fecha: '', obs: '' 
     };
 
-    // --- FUNCIONES UI/UX ---
-    function nav(screenId) {
+    function nav(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(screenId).classList.add('active');
-    }
-    
-    function showLoading(text) {
-      document.getElementById('loading-text').innerText = text;
-      document.getElementById('loading').style.display = 'flex';
-    }
-    function hideLoading() { document.getElementById('loading').style.display = 'none'; }
-
-    function showAlert(title, text, icon = 'error') {
-      Swal.fire({ title, text, icon, confirmButtonColor: '#0d6efd', borderRadius: '20px' });
+      document.getElementById(id).classList.add('active');
     }
 
-    // --- FLUJO DE PANTALLAS ---
+    function toggleLoader(show) {
+      document.getElementById('loader').style.display = show ? 'block' : 'none';
+    }
+
+    // 1. LOGIN
     function login() {
       const p = document.getElementById('pass').value;
-      if(p === 'GMP2026') { state.pass = p; nav('screen-menu'); } 
-      else { showAlert('Error de Acceso', 'La contraseña es incorrecta.', 'error'); }
+      if (p === 'GMP2026') { db.password = p; nav('s-movimiento'); } 
+      else { alert('Contraseña incorrecta'); }
     }
 
-    function setMovimiento(mov) {
-      state.movimiento = mov;
-      nav('screen-tipo');
+    // 2. MOVIMIENTO
+    function setMovimiento(val) {
+      db.movimiento = val;
+      nav('s-tipo');
     }
 
-    function setTipo(tipo) {
-      state.tipo = tipo;
-      if (state.movimiento === 'Envío') {
-        state.proveedor = 'Envío';
-        nav('screen-foto');
+    // 3. TIPO
+    function setTipo(val) {
+      db.tipo = val;
+      if (db.movimiento === 'Envío') {
+        db.proveedor = 'Envío';
+        nav('s-foto');
       } else {
-        nav('screen-foto');
+        nav('s-foto');
       }
     }
 
-    // --- PROCESAMIENTO DE FOTO ---
-    function handleFile(input) {
-      const file = input.files[0];
-      if (!file) return;
-      
-      const isPDF = file.type === 'application/pdf';
-      state.fileName = file.name;
-      
+    // 4. FOTO
+    function previewFile() {
+      const file = document.getElementById('inputFile').files[0];
+      if(!file) return;
+      db.fileName = file.name;
       const reader = new FileReader();
       reader.onload = function(e) {
-        state.fotoBase64 = e.target.result;
-        document.getElementById('preview-container').style.display = 'block';
-        if(isPDF) {
-          document.getElementById('preview-img').src = 'https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg';
-        } else {
-          document.getElementById('preview-img').src = state.fotoBase64;
-        }
-        document.getElementById('preview-name').innerText = file.name;
+        db.fotoBase64 = e.target.result;
+        document.getElementById('imgPreview').src = db.fotoBase64;
+        document.getElementById('imgPreview').style.display = 'block';
+        document.getElementById('btnSiguienteFoto').classList.remove('hidden');
       };
       reader.readAsDataURL(file);
     }
 
     function validarFoto() {
-      if(!state.fotoBase64) { showAlert("Atención", "Debes adjuntar la foto o PDF del remito para continuar.", "warning"); return; }
-      if(state.movimiento === 'Envío') prepararCantidad();
-      else armarPantallaProveedor();
+      if(!db.fotoBase64) return alert('La foto es obligatoria');
+      if (db.movimiento === 'Envío') armarCantidad();
+      else armarProveedor();
     }
 
-    // --- LÓGICA DE PROVEEDOR ---
-    function armarPantallaProveedor() {
-      document.getElementById('prov-tarimas').style.display = state.tipo === 'Tarimas' ? 'block' : 'none';
-      document.getElementById('prov-stretch').style.display = state.tipo === 'Stretch' ? 'block' : 'none';
-      document.getElementById('prov-dropdown-area').style.display = 'none';
+    // 5. PROVEEDOR
+    function armarProveedor() {
+      document.getElementById('provTarimasBtns').classList.add('hidden');
+      document.getElementById('provStretchBtns').classList.add('hidden');
+      document.getElementById('divOtroProv').classList.add('hidden');
       
-      if(state.listas.tarimas.length === 0) {
-        showLoading("Sincronizando proveedores...");
-        google.script.run.withSuccessHandler(res => {
-          state.listas = res;
-          hideLoading();
-          nav('screen-proveedor');
-        }).getProveedores();
+      if(db.tipo === 'Tarimas') document.getElementById('provTarimasBtns').classList.remove('hidden');
+      else document.getElementById('provStretchBtns').classList.remove('hidden');
+      nav('s-proveedor');
+    }
+
+    function mostrarOtroProv() {
+      document.getElementById('divOtroProv').classList.remove('hidden');
+    }
+
+    function setProv(val) {
+      if(!val) return;
+      db.proveedor = val;
+      armarCantidad();
+    }
+
+    // 6. CANTIDAD
+    function armarCantidad() {
+      document.getElementById('botonesTarimas').classList.add('hidden');
+      document.getElementById('divCantManual').classList.add('hidden');
+      document.getElementById('inputBobinas').classList.add('hidden');
+
+      if (db.tipo === 'Tarimas') {
+        document.getElementById('botonesTarimas').classList.remove('hidden');
       } else {
-        nav('screen-proveedor');
+        document.getElementById('divCantManual').classList.remove('hidden');
+        document.getElementById('inputBobinas').classList.remove('hidden');
       }
+      nav('s-cantidad');
     }
 
-    function setProvDirecto(prov) {
-      state.proveedor = prov;
-      prepararCantidad();
+    function mostrarManualCant() {
+      document.getElementById('divCantManual').classList.remove('hidden');
     }
 
-    function setProvDropdown(categoria) {
-      const sel = document.getElementById('prov-select');
-      sel.innerHTML = '<option value="">Seleccione un proveedor...</option>';
-      let opciones = [];
+    function setCant(val) { // Para los botones de 500, 600, 1400
+      db.cantidad = val;
+      prepararDetalles();
+    }
+
+    function guardarCantManual() {
+      const c = document.getElementById('inputCant').value;
+      if(!c || c <= 0) return alert('Ingrese una cantidad válida');
+      db.cantidad = c;
+      if(db.tipo === 'Stretch') db.cantBobinas = document.getElementById('inputBobinas').value;
+      prepararDetalles();
+    }
+
+    // 7. DETALLES
+    function prepararDetalles() {
+      document.getElementById('valFecha').valueAsDate = new Date();
+      nav('s-detalles');
+    }
+
+    // 8. ENVÍO AL BACKEND MEDIANTE FETCH
+    function enviarDatos() {
+      db.remito = document.getElementById('valRemito').value.trim();
+      db.fecha = document.getElementById('valFecha').value;
+      db.obs = document.getElementById('valObs').value.trim();
+
+      if(!db.remito) return alert('Ingrese Nº de remito');
       
-      if(state.tipo === 'Tarimas') {
-        if(categoria === 'Tucumán Pallet / Chivilisco') {
-          opciones = state.listas.tarimas.filter(p => p.includes("Tucumán Pallet") || p.includes("Chivilisco"));
+      toggleLoader(true);
+      
+      // La solicitud POST desde GitHub hacia Apps Script (bypass de CORS usando text/plain implícito)
+      fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: "procesarCarga", payload: db })
+      })
+      .then(response => response.json())
+      .then(data => {
+        toggleLoader(false);
+        if (data.exito) {
+          alert('¡Registro exitoso!');
+          location.reload(); // Reinicia la app para el siguiente registro
         } else {
-          opciones = state.listas.tarimas.filter(p => !p.includes("Tucumán Pallet") && !p.includes("Chivilisco") && p !== "Gianni" && p !== "Envío");
+          alert('Error: ' + data.mensaje);
         }
-      } else {
-        opciones = state.listas.stretch.filter(p => p !== "Urflex" && p !== "Envío");
-        opciones.push("++ NUEVO PROVEEDOR ++");
-      }
-
-      opciones.forEach(o => sel.innerHTML += `<option value="${o}">${o}</option>`);
-      document.getElementById('prov-dropdown-area').style.display = 'block';
-      
-      // Scroll suave hacia el dropdown
-      setTimeout(() => document.getElementById('prov-dropdown-area').scrollIntoView({ behavior: 'smooth' }), 100);
-      checkNuevoProv();
-    }
-
-    function checkNuevoProv() {
-      const isNuevo = document.getElementById('prov-select').value === "++ NUEVO PROVEEDOR ++";
-      document.getElementById('div-nuevo-prov').style.display = isNuevo ? 'block' : 'none';
-    }
-
-    function confirmarProvDropdown() {
-      const val = document.getElementById('prov-select').value;
-      if(!val) { showAlert("Faltan datos", "Por favor seleccione un proveedor.", "warning"); return; }
-      
-      if(val === "++ NUEVO PROVEEDOR ++") {
-        const nuevo = document.getElementById('nuevo-prov').value.trim();
-        if(!nuevo) { showAlert("Faltan datos", "Escriba el nombre del nuevo proveedor.", "warning"); return; }
-        
-        Swal.fire({
-          title: '¿Crear proveedor?',
-          text: `Se agregará "${nuevo}" a la base de datos de Stretch.`,
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonText: 'Sí, crear',
-          cancelButtonText: 'Cancelar'
-        }).then((result) => {
-          if (result.isConfirmed) {
-            state.proveedor = nuevo;
-            showLoading("Registrando proveedor...");
-            google.script.run.withSuccessHandler(() => {
-              state.listas.stretch.push(nuevo);
-              hideLoading();
-              prepararCantidad();
-            }).agregarProveedorStretch(nuevo);
-          }
-        });
-      } else {
-        state.proveedor = val;
-        prepararCantidad();
-      }
-    }
-
-    function backToProv() {
-      if(state.movimiento === 'Envío') nav('screen-foto');
-      else nav('screen-proveedor');
-    }
-
-    // --- CANTIDAD Y REMITO ---
-    function prepararCantidad() {
-      document.getElementById('val-cantidad').value = '';
-      document.getElementById('val-bobinas').value = '';
-      document.getElementById('lbl-cantidad').innerText = state.tipo === 'Tarimas' ? 'Cantidad de Tarimas' : 'Cantidad de Stretch [Kg]';
-      document.getElementById('div-bobinas').style.display = state.tipo === 'Stretch' ? 'block' : 'none';
-
-      showLoading("Analizando historial...");
-      google.script.run.withSuccessHandler(res => {
-        hideLoading();
-        
-        const divSugs = document.getElementById('btn-sugerencias');
-        divSugs.innerHTML = '';
-        if(res.cantidadesTop.length > 0) {
-          res.cantidadesTop.forEach(c => { divSugs.innerHTML += `<button class="btn-qty" onclick="usarCant(${c})">${c}</button>`; });
-          document.getElementById('btn-sugerencias').style.display = 'flex';
-        } else {
-          divSugs.innerHTML = '<span style="color:var(--text-sec); font-size:14px;">No hay registros previos para calcular sugerencias.</span>';
-        }
-
-        document.getElementById('val-remito').value = res.remitoSugerido;
-        nav('screen-cantidad');
-      }).getDatosPrecarga(state.tipo, state.proveedor);
-    }
-
-    function usarCant(val) { document.getElementById('val-cantidad').value = val; }
-
-    function validarCantidad() {
-      const c = parseFloat(document.getElementById('val-cantidad').value);
-      if(!c || c <= 0) { showAlert("Inválido", "Ingrese una cantidad numérica mayor a 0.", "error"); return; }
-      state.cantidad = c;
-      if(state.tipo === 'Stretch') state.cantBobinas = parseFloat(document.getElementById('val-bobinas').value) || '';
-      
-      let hint = "";
-      if(state.movimiento === 'Ingreso' && state.tipo === 'Tarimas') {
-        if(state.proveedor === 'Gianni') hint = "<i class='fa-solid fa-circle-exclamation'></i> Requiere exactamente 6 dígitos.";
-        else if(state.proveedor.includes('Tucumán Pallet') || state.proveedor.includes('Chivilisco')) hint = "<i class='fa-solid fa-circle-exclamation'></i> Requiere entre 1 y 4 dígitos.";
-      }
-      document.getElementById('remito-hint').innerHTML = hint;
-
-      nav('screen-remito');
-    }
-
-    function validarRemito() {
-      const r = document.getElementById('val-remito').value.trim();
-      if(!r) { showAlert("Requerido", "El número de remito es obligatorio.", "warning"); return; }
-
-      if(state.movimiento === 'Ingreso' && state.tipo === 'Tarimas') {
-        if(state.proveedor === 'Gianni' && !/^\d{6}$/.test(r)) {
-          showAlert("Formato Incorrecto", "Para Gianni, el remito debe contener exactamente 6 números.", "error"); return;
-        }
-        if((state.proveedor.includes('Tucumán Pallet') || state.proveedor.includes('Chivilisco')) && !/^\d{1,4}$/.test(r)) {
-          showAlert("Formato Incorrecto", "Para este proveedor, el remito debe contener de 1 a 4 números.", "error"); return;
-        }
-      }
-      state.remito = r;
-      document.getElementById('val-fecha').valueAsDate = new Date();
-      document.getElementById('val-obs').value = '';
-      nav('screen-detalles');
-    }
-
-    // --- REVISIÓN Y GUARDADO ---
-    function irARevision() {
-      const f = document.getElementById('val-fecha').value;
-      if(!f) { showAlert("Requerido", "Seleccione la fecha del movimiento.", "warning"); return; }
-      state.fecha = f;
-      state.obs = document.getElementById('val-obs').value.trim();
-
-      document.getElementById('rev-mov').innerText = state.movimiento.toUpperCase();
-      document.getElementById('rev-tipo').innerText = state.tipo;
-      document.getElementById('rev-prov').innerText = state.proveedor;
-      document.getElementById('rev-cant').innerText = state.cantidad + (state.tipo==='Stretch'?' Kg':' Ud.');
-      
-      if(state.tipo === 'Stretch' && state.cantBobinas) {
-        document.getElementById('li-rev-bob').style.display = 'flex';
-        document.getElementById('rev-bob').innerText = state.cantBobinas + ' Bob.';
-      } else {
-        document.getElementById('li-rev-bob').style.display = 'none';
-      }
-
-      document.getElementById('rev-remito').innerText = state.remito;
-      document.getElementById('rev-fecha').innerText = state.fecha;
-
-      nav('screen-revision');
-    }
-
-    function guardarMovimiento() {
-      showLoading("Procesando en el servidor...");
-      google.script.run.withSuccessHandler(res => {
-        hideLoading();
-        if(res.exito) {
-          Swal.fire({
-            title: '¡Operación Exitosa!',
-            text: res.mensaje,
-            icon: 'success',
-            confirmButtonColor: '#198754'
-          }).then(() => {
-            // Reset y volver al menú
-            state.fotoBase64 = null;
-            document.getElementById('preview-container').style.display = 'none';
-            document.getElementById('file-cam').value = '';
-            document.getElementById('file-gal').value = '';
-            nav('screen-menu');
-          });
-        } else {
-          showAlert("Error de Servidor", res.mensaje, "error");
-        }
-      }).procesarCarga(state);
+      })
+      .catch(error => {
+        toggleLoader(false);
+        alert('Error de conexión con el servidor.');
+        console.error(error);
+      });
     }
   </script>
 </body>
