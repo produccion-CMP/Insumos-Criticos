@@ -2,176 +2,192 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GMP Insumos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sistema Logístico GMP</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    /* Estilos minimalistas y de alto contraste para entorno industrial */
-    body { font-family: Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
-    .screen { display: none; max-width: 400px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .screen.active { display: block; animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    :root {
+      --primary: #1d4ed8; --primary-hover: #1e40af;
+      --surface: #ffffff; --background: #f1f5f9;
+      --text: #0f172a; --text-muted: #64748b;
+      --border: #e2e8f0; --success: #16a34a; --radius: 12px;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--background); color: var(--text); margin: 0; padding: 20px; overflow-x: hidden; }
     
-    h2 { text-align: center; margin-top: 0; color: #0056b3; }
-    .btn { display: block; width: 100%; padding: 15px; margin-bottom: 10px; border: none; border-radius: 5px; font-size: 18px; font-weight: bold; cursor: pointer; text-align: center; transition: background 0.2s; }
-    .btn-primary { background-color: #0056b3; color: white; }
-    .btn-primary:active { background-color: #004494; }
-    .btn-secondary { background-color: #e2e8f0; color: #333; }
-    .btn-secondary:active { background-color: #cbd5e1; }
-    .btn-success { background-color: #28a745; color: white; }
+    .container { max-width: 450px; margin: 0 auto; min-height: 90vh; display: flex; flex-direction: column; justify-content: center; }
     
+    .screen { display: none; background: var(--surface); padding: 30px 20px; border-radius: var(--radius); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+    .screen.active { display: block; animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+    h2 { margin: 0 0 20px 0; font-size: 1.5rem; text-align: center; color: var(--text); font-weight: 600; }
+    p.subtitle { text-align: center; color: var(--text-muted); margin-top: -15px; margin-bottom: 25px; font-size: 0.9rem; }
+
+    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px; margin-bottom: 12px; border: none; border-radius: var(--radius); font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--background); color: var(--text); border: 1px solid var(--border); }
+    .btn i { font-size: 1.3rem; color: var(--primary); }
+    .btn:active { transform: scale(0.98); background: #e2e8f0; }
+    
+    .btn-primary { background: var(--primary); color: white; border: none; }
+    .btn-primary i { color: white; }
+    .btn-primary:active { background: var(--primary-hover); }
+
+    .btn-success { background: var(--success); color: white; border: none; margin-top: 15px; }
+    .btn-success i { color: white; }
+
+    .btn-outline { background: transparent; border: 2px dashed var(--border); color: var(--text-muted); }
+    .btn-outline i { color: var(--text-muted); }
+
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-    input[type="text"], input[type="password"], input[type="number"], input[type="date"] { width: 100%; padding: 15px; margin-bottom: 15px; border: 2px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
     
-    .hidden { display: none; }
-    #loader { display: none; text-align: center; font-weight: bold; color: #0056b3; padding: 20px; }
-    img.preview { max-width: 100%; height: auto; border-radius: 5px; margin-bottom: 15px; display: none; }
+    input { width: 100%; padding: 16px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem; box-sizing: border-box; background: var(--background); outline: none; transition: border 0.2s; }
+    input:focus { border-color: var(--primary); }
+
+    .hidden { display: none !important; }
+    #preview-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: var(--radius); margin-bottom: 15px; border: 1px solid var(--border); }
+    
+    #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; font-weight: 600; font-size: 1.2rem; color: var(--primary); }
+    .spinner { border: 4px solid var(--border); border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-  <div id="loader">Conectando con el servidor...</div>
-
-  <!-- LOGIN -->
-  <div id="s-login" class="screen active">
-    <h2>Acceso</h2>
-    <input type="password" id="pass" placeholder="Contraseña">
-    <button class="btn btn-primary" onclick="login()">Ingresar</button>
+  <div id="loader" class="hidden">
+    <div class="spinner"></div>
+    <span>Procesando...</span>
   </div>
 
-  <!-- MOVIMIENTO -->
-  <div id="s-movimiento" class="screen">
-    <h2>Tipo de Operación</h2>
-    <button class="btn btn-secondary" onclick="setMovimiento('Ingreso')">📥 Ingreso</button>
-    <button class="btn btn-secondary" onclick="setMovimiento('Envío')">📤 Envío</button>
-  </div>
-
-  <!-- INSUMO -->
-  <div id="s-tipo" class="screen">
-    <h2>Insumo</h2>
-    <button class="btn btn-secondary" onclick="setTipo('Tarimas')">🟫 Tarimas</button>
-    <button class="btn btn-secondary" onclick="setTipo('Stretch')">🌀 Stretch</button>
-  </div>
-
-  <!-- FOTO -->
-  <div id="s-foto" class="screen">
-    <h2>Evidencia</h2>
-    <input type="file" id="inputFile" accept="image/*" capture="environment" style="display:none;" onchange="previewFile()">
-    <button class="btn btn-secondary" onclick="document.getElementById('inputFile').click()">📸 Abrir Cámara / Galería</button>
-    <img id="imgPreview" class="preview">
-    <button class="btn btn-primary hidden" id="btnSiguienteFoto" onclick="validarFoto()">Continuar</button>
-  </div>
-
-  <!-- PROVEEDOR -->
-  <div id="s-proveedor" class="screen">
-    <h2>Proveedor</h2>
-    <div id="provTarimasBtns" class="hidden">
-      <button class="btn btn-secondary" onclick="setProv('Tucumán Pallet')">Tucumán Pallet</button>
-      <button class="btn btn-secondary" onclick="setProv('Gianni')">Gianni</button>
-      <button class="btn btn-secondary" onclick="mostrarOtroProv()">Otro...</button>
-    </div>
-    <div id="provStretchBtns" class="hidden">
-      <button class="btn btn-secondary" onclick="setProv('Urflex')">Urflex</button>
-      <button class="btn btn-secondary" onclick="mostrarOtroProv()">Otro...</button>
-    </div>
-    <div id="divOtroProv" class="hidden">
-      <input type="text" id="inputOtroProv" placeholder="Escriba el proveedor">
-      <button class="btn btn-primary" onclick="setProv(document.getElementById('inputOtroProv').value)">Aceptar</button>
-    </div>
-  </div>
-
-  <!-- CANTIDAD -->
-  <div id="s-cantidad" class="screen">
-    <h2>Cantidad</h2>
+  <div class="container">
     
-    <!-- Botones rápidos solicitados para Tarimas -->
-    <div id="botonesTarimas" class="grid-2 hidden">
-      <button class="btn btn-secondary" onclick="setCant(500)">500</button>
-      <button class="btn btn-secondary" onclick="setCant(600)">600</button>
-      <button class="btn btn-secondary" onclick="setCant(1400)">1400</button>
-      <button class="btn btn-secondary" onclick="mostrarManualCant()">Otro</button>
+    <!-- 1. LOGIN -->
+    <div id="s-login" class="screen active">
+      <h2><i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Control de Acceso</h2>
+      <input type="password" id="pass" placeholder="Ingresar contraseña" style="text-align: center; letter-spacing: 2px;">
+      <button class="btn btn-primary" onclick="login()">Ingresar <i class="fa-solid fa-arrow-right"></i></button>
     </div>
 
-    <!-- Entrada manual (para Stretch o para "Otro" en Tarimas) -->
-    <div id="divCantManual" class="hidden">
-      <input type="number" id="inputCant" placeholder="Cantidad (Kg o Unidades)">
-      <input type="number" id="inputBobinas" class="hidden" placeholder="Cantidad Bobinas (Opcional)">
-      <button class="btn btn-primary" onclick="guardarCantManual()">Continuar</button>
+    <!-- 2. MOVIMIENTO -->
+    <div id="s-movimiento" class="screen">
+      <h2>Tipo de Movimiento</h2>
+      <button class="btn" onclick="setMovimiento('Ingreso')"><i class="fa-solid fa-arrow-down-to-bracket"></i> Registrar Ingreso</button>
+      <button class="btn" onclick="setMovimiento('Envío')"><i class="fa-solid fa-truck-fast"></i> Registrar Envío</button>
     </div>
-  </div>
 
-  <!-- REMITO Y FECHA -->
-  <div id="s-detalles" class="screen">
-    <h2>Detalles</h2>
-    <input type="text" id="valRemito" placeholder="Nº Remito">
-    <input type="date" id="valFecha">
-    <input type="text" id="valObs" placeholder="Observaciones (Opcional)">
-    <button class="btn btn-success" onclick="enviarDatos()">Guardar Registro</button>
+    <!-- 3. TIPO INSUMO -->
+    <div id="s-tipo" class="screen">
+      <h2>Seleccionar Insumo</h2>
+      <button class="btn" onclick="setTipo('Tarimas')"><i class="fa-solid fa-pallet" style="color: #8b5cf6;"></i> Tarimas</button>
+      <button class="btn" onclick="setTipo('Stretch')"><i class="fa-solid fa-box-open" style="color: #06b6d4;"></i> Film Stretch</button>
+    </div>
+
+    <!-- 4. PROVEEDOR -->
+    <div id="s-proveedor" class="screen">
+      <h2>Proveedor</h2>
+      
+      <div id="provTarimasBtns" class="hidden">
+        <button class="btn" onclick="setProv('Tucumán Pallet')">Tucumán Pallet</button>
+        <button class="btn" onclick="setProv('Gianni')">Gianni</button>
+        <button class="btn btn-outline" onclick="mostrarOtroProv()"><i class="fa-solid fa-plus"></i> Ingresar otro</button>
+      </div>
+      
+      <div id="provStretchBtns" class="hidden">
+        <button class="btn" onclick="setProv('Urflex')">Urflex</button>
+        <button class="btn btn-outline" onclick="mostrarOtroProv()"><i class="fa-solid fa-plus"></i> Ingresar otro</button>
+      </div>
+
+      <div id="divOtroProv" class="hidden" style="margin-top: 15px;">
+        <input type="text" id="inputOtroProv" placeholder="Escriba la razón social">
+        <button class="btn btn-primary" onclick="setProv(document.getElementById('inputOtroProv').value)">Confirmar <i class="fa-solid fa-check"></i></button>
+      </div>
+    </div>
+
+    <!-- 5. CANTIDAD -->
+    <div id="s-cantidad" class="screen">
+      <h2 id="lblCantidad">Cantidad</h2>
+      
+      <!-- Botones predefinidos para Tarimas -->
+      <div id="botonesTarimas" class="grid-2 hidden">
+        <button class="btn" onclick="setCant(500)">500</button>
+        <button class="btn" onclick="setCant(600)">600</button>
+        <button class="btn" onclick="setCant(1400)">1400</button>
+        <button class="btn btn-outline" onclick="mostrarManualCant()"><i class="fa-solid fa-keyboard"></i> Otro</button>
+      </div>
+
+      <!-- Input Manual -->
+      <div id="divCantManual" class="hidden">
+        <input type="number" id="inputCant" placeholder="Cantidad (Unidades/Kg)" inputmode="decimal">
+        <input type="number" id="inputBobinas" class="hidden" placeholder="Cantidad Bobinas (Opcional)" inputmode="decimal">
+        <button class="btn btn-primary" onclick="guardarCantManual()">Siguiente <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <!-- 6. FOTO (OPCIONAL) -->
+    <div id="s-foto" class="screen">
+      <h2>Evidencia de Remito</h2>
+      <p class="subtitle">La fotografía del documento es opcional.</p>
+      
+      <input type="file" id="inputFile" accept="image/*" capture="environment" class="hidden" onchange="previewFile()">
+      <button class="btn" onclick="document.getElementById('inputFile').click()"><i class="fa-solid fa-camera"></i> Tomar Fotografía</button>
+      
+      <img id="imgPreview" class="hidden">
+      
+      <button class="btn btn-primary hidden" id="btnOkFoto" onclick="avanzarADetalles()"><i class="fa-solid fa-check"></i> Usar esta foto</button>
+      <button class="btn btn-outline" id="btnOmitirFoto" onclick="omitirFoto()"><i class="fa-solid fa-forward-step"></i> Omitir paso</button>
+    </div>
+
+    <!-- 7. DETALLES -->
+    <div id="s-detalles" class="screen">
+      <h2>Finalizar Registro</h2>
+      <label style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600; padding-left: 5px;">Nº de Remito</label>
+      <input type="text" id="valRemito" placeholder="Ej: 0000-123456">
+      
+      <label style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600; padding-left: 5px;">Fecha Operación</label>
+      <input type="date" id="valFecha">
+      
+      <label style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600; padding-left: 5px;">Observaciones (Opcional)</label>
+      <input type="text" id="valObs" placeholder="Anotaciones...">
+      
+      <button class="btn btn-success" onclick="enviarDatos()"><i class="fa-solid fa-cloud-arrow-up"></i> Guardar en Base de Datos</button>
+    </div>
+
   </div>
 
   <script>
     // ⚠️ REEMPLAZAR POR LA URL DE APPS SCRIPT
-    const API_URL = "https://script.google.com/macros/s/AKfycbzM9LjJ-CJiEbUS0gs42KVmRx0ZnDsJrl1kd7vSeUORJe3T3NXrLX2CRp8RnEDwiiQ0/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbzM9LjJ-CJiEbUS0gs42KVmRx0ZnDsJrl1kd7vSeUORJe3T3NXrLX2CRp8RnEDwiiQ0/exec";
 
-    let db = { 
-      password: '', movimiento: '', tipo: '', proveedor: '', cantidad: '', 
-      cantBobinas: '', fotoBase64: '', fileName: '', remito: '', fecha: '', obs: '' 
-    };
+    let db = { password: '', movimiento: '', tipo: '', proveedor: '', cantidad: '', cantBobinas: '', fotoBase64: '', fileName: '', remito: '', fecha: '', obs: '' };
 
     function nav(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById(id).classList.add('active');
     }
 
-    function toggleLoader(show) {
-      document.getElementById('loader').style.display = show ? 'block' : 'none';
+    function toggleLoader(state) {
+      document.getElementById('loader').classList.toggle('hidden', !state);
     }
 
-    // 1. LOGIN
     function login() {
       const p = document.getElementById('pass').value;
       if (p === 'GMP2026') { db.password = p; nav('s-movimiento'); } 
-      else { alert('Contraseña incorrecta'); }
+      else { alert('Credenciales inválidas.'); }
     }
 
-    // 2. MOVIMIENTO
     function setMovimiento(val) {
       db.movimiento = val;
       nav('s-tipo');
     }
 
-    // 3. TIPO
     function setTipo(val) {
       db.tipo = val;
       if (db.movimiento === 'Envío') {
         db.proveedor = 'Envío';
-        nav('s-foto');
+        armarCantidad();
       } else {
-        nav('s-foto');
+        armarProveedor();
       }
     }
 
-    // 4. FOTO
-    function previewFile() {
-      const file = document.getElementById('inputFile').files[0];
-      if(!file) return;
-      db.fileName = file.name;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        db.fotoBase64 = e.target.result;
-        document.getElementById('imgPreview').src = db.fotoBase64;
-        document.getElementById('imgPreview').style.display = 'block';
-        document.getElementById('btnSiguienteFoto').classList.remove('hidden');
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function validarFoto() {
-      if(!db.fotoBase64) return alert('La foto es obligatoria');
-      if (db.movimiento === 'Envío') armarCantidad();
-      else armarProveedor();
-    }
-
-    // 5. PROVEEDOR
     function armarProveedor() {
       document.getElementById('provTarimasBtns').classList.add('hidden');
       document.getElementById('provStretchBtns').classList.add('hidden');
@@ -182,83 +198,95 @@
       nav('s-proveedor');
     }
 
-    function mostrarOtroProv() {
-      document.getElementById('divOtroProv').classList.remove('hidden');
-    }
+    function mostrarOtroProv() { document.getElementById('divOtroProv').classList.remove('hidden'); }
 
     function setProv(val) {
-      if(!val) return;
-      db.proveedor = val;
+      if(!val.trim()) return;
+      db.proveedor = val.trim();
       armarCantidad();
     }
 
-    // 6. CANTIDAD
     function armarCantidad() {
       document.getElementById('botonesTarimas').classList.add('hidden');
       document.getElementById('divCantManual').classList.add('hidden');
       document.getElementById('inputBobinas').classList.add('hidden');
 
       if (db.tipo === 'Tarimas') {
+        document.getElementById('lblCantidad').innerText = 'Cantidad de Tarimas';
         document.getElementById('botonesTarimas').classList.remove('hidden');
       } else {
+        document.getElementById('lblCantidad').innerText = 'Cantidad de Stretch';
         document.getElementById('divCantManual').classList.remove('hidden');
         document.getElementById('inputBobinas').classList.remove('hidden');
       }
       nav('s-cantidad');
     }
 
-    function mostrarManualCant() {
-      document.getElementById('divCantManual').classList.remove('hidden');
-    }
+    function mostrarManualCant() { document.getElementById('divCantManual').classList.remove('hidden'); }
 
-    function setCant(val) { // Para los botones de 500, 600, 1400
+    function setCant(val) {
       db.cantidad = val;
-      prepararDetalles();
+      nav('s-foto');
     }
 
     function guardarCantManual() {
       const c = document.getElementById('inputCant').value;
-      if(!c || c <= 0) return alert('Ingrese una cantidad válida');
+      if(!c || c <= 0) return alert('Valor numérico inválido.');
       db.cantidad = c;
       if(db.tipo === 'Stretch') db.cantBobinas = document.getElementById('inputBobinas').value;
-      prepararDetalles();
+      nav('s-foto');
     }
 
-    // 7. DETALLES
-    function prepararDetalles() {
+    function previewFile() {
+      const file = document.getElementById('inputFile').files[0];
+      if(!file) return;
+      db.fileName = file.name;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        db.fotoBase64 = e.target.result;
+        document.getElementById('imgPreview').src = db.fotoBase64;
+        document.getElementById('imgPreview').classList.remove('hidden');
+        document.getElementById('btnOkFoto').classList.remove('hidden');
+        document.getElementById('btnOmitirFoto').classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function omitirFoto() {
+      db.fotoBase64 = "";
+      avanzarADetalles();
+    }
+
+    function avanzarADetalles() {
       document.getElementById('valFecha').valueAsDate = new Date();
       nav('s-detalles');
     }
 
-    // 8. ENVÍO AL BACKEND MEDIANTE FETCH
     function enviarDatos() {
       db.remito = document.getElementById('valRemito').value.trim();
       db.fecha = document.getElementById('valFecha').value;
       db.obs = document.getElementById('valObs').value.trim();
 
-      if(!db.remito) return alert('Ingrese Nº de remito');
+      if(!db.remito) return alert('El número de remito es obligatorio.');
       
       toggleLoader(true);
-      
-      // La solicitud POST desde GitHub hacia Apps Script (bypass de CORS usando text/plain implícito)
       fetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({ action: "procesarCarga", payload: db })
       })
-      .then(response => response.json())
+      .then(r => r.json())
       .then(data => {
         toggleLoader(false);
         if (data.exito) {
-          alert('¡Registro exitoso!');
-          location.reload(); // Reinicia la app para el siguiente registro
+          alert('Registro completado.');
+          location.reload(); 
         } else {
           alert('Error: ' + data.mensaje);
         }
       })
-      .catch(error => {
+      .catch(e => {
         toggleLoader(false);
-        alert('Error de conexión con el servidor.');
-        console.error(error);
+        alert('Fallo de red al conectar con el servidor.');
       });
     }
   </script>
