@@ -7,45 +7,37 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <style>
     :root {
-      --primary: #1d4ed8; --primary-hover: #1e40af;
-      --surface: #ffffff; --background: #f1f5f9;
-      --text: #0f172a; --text-muted: #64748b;
-      --border: #e2e8f0; --success: #16a34a; --radius: 12px;
+      --primary: #1d4ed8; --surface: #ffffff; --background: #f1f5f9;
+      --text: #0f172a; --text-muted: #64748b; --border: #e2e8f0;
+      --success: #16a34a; --radius: 12px;
     }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--background); color: var(--text); margin: 0; padding: 20px; overflow-x: hidden; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--background); color: var(--text); margin: 0; padding: 20px; }
     
     .container { max-width: 450px; margin: 0 auto; min-height: 90vh; display: flex; flex-direction: column; justify-content: center; }
     
+    .header { display: flex; align-items: center; margin-bottom: 20px; }
+    .btn-back { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted); padding: 5px 15px 5px 0; }
+    .header h2 { margin: 0; font-size: 1.4rem; color: var(--text); }
+
     .screen { display: none; background: var(--surface); padding: 30px 20px; border-radius: var(--radius); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid var(--border); }
-    .screen.active { display: block; animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    .screen.active { display: block; animation: slideIn 0.2s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
 
-    h2 { margin: 0 0 20px 0; font-size: 1.5rem; text-align: center; color: var(--text); font-weight: 600; }
-    p.subtitle { text-align: center; color: var(--text-muted); margin-top: -15px; margin-bottom: 25px; font-size: 0.9rem; }
-
-    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px; margin-bottom: 12px; border: none; border-radius: var(--radius); font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--background); color: var(--text); border: 1px solid var(--border); }
-    .btn i { font-size: 1.3rem; color: var(--primary); }
-    .btn:active { transform: scale(0.98); background: #e2e8f0; }
-    
+    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px; margin-bottom: 12px; border: none; border-radius: var(--radius); font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: background 0.1s; background: var(--background); color: var(--text); border: 1px solid var(--border); }
+    .btn:active { background: #e2e8f0; }
     .btn-primary { background: var(--primary); color: white; border: none; }
-    .btn-primary i { color: white; }
-    .btn-primary:active { background: var(--primary-hover); }
-
+    .btn-primary:active { background: #1e40af; }
     .btn-success { background: var(--success); color: white; border: none; margin-top: 15px; }
-    .btn-success i { color: white; }
-
-    .btn-outline { background: transparent; border: 2px dashed var(--border); color: var(--text-muted); }
-    .btn-outline i { color: var(--text-muted); }
 
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
     
-    input { width: 100%; padding: 16px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem; box-sizing: border-box; background: var(--background); outline: none; transition: border 0.2s; }
-    input:focus { border-color: var(--primary); }
+    input, select { width: 100%; padding: 16px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem; box-sizing: border-box; background: var(--background); outline: none; }
+    input:focus, select:focus { border-color: var(--primary); }
 
     .hidden { display: none !important; }
     #preview-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: var(--radius); margin-bottom: 15px; border: 1px solid var(--border); }
     
-    #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; font-weight: 600; font-size: 1.2rem; color: var(--primary); }
+    #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; font-weight: 600; color: var(--primary); }
     .spinner { border: 4px solid var(--border); border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
@@ -54,192 +46,236 @@
 
   <div id="loader" class="hidden">
     <div class="spinner"></div>
-    <span>Procesando...</span>
+    <span>Consultando Base de Datos...</span>
   </div>
 
   <div class="container">
     
+    <!-- HEADER DINÁMICO -->
+    <div class="header hidden" id="appHeader">
+      <button class="btn-back" onclick="goBack()"><i class="fa-solid fa-arrow-left"></i></button>
+      <h2 id="screenTitle">Título</h2>
+    </div>
+
     <!-- 1. LOGIN -->
     <div id="s-login" class="screen active">
-      <h2><i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Control de Acceso</h2>
+      <h2 style="text-align: center; margin-bottom: 20px;">Control de Acceso</h2>
       <input type="password" id="pass" placeholder="Ingresar contraseña" style="text-align: center; letter-spacing: 2px;">
-      <button class="btn btn-primary" onclick="login()">Ingresar <i class="fa-solid fa-arrow-right"></i></button>
+      <button class="btn btn-primary" onclick="login()">Ingresar</button>
     </div>
 
     <!-- 2. MOVIMIENTO -->
     <div id="s-movimiento" class="screen">
-      <h2>Tipo de Movimiento</h2>
       <button class="btn" onclick="setMovimiento('Ingreso')"><i class="fa-solid fa-arrow-down-to-bracket"></i> Registrar Ingreso</button>
       <button class="btn" onclick="setMovimiento('Envío')"><i class="fa-solid fa-truck-fast"></i> Registrar Envío</button>
     </div>
 
     <!-- 3. TIPO INSUMO -->
     <div id="s-tipo" class="screen">
-      <h2>Seleccionar Insumo</h2>
-      <button class="btn" onclick="setTipo('Tarimas')"><i class="fa-solid fa-pallet" style="color: #8b5cf6;"></i> Tarimas</button>
-      <button class="btn" onclick="setTipo('Stretch')"><i class="fa-solid fa-box-open" style="color: #06b6d4;"></i> Film Stretch</button>
+      <button class="btn" onclick="loadProveedores('Tarimas')"><i class="fa-solid fa-pallet" style="color: #8b5cf6;"></i> Tarimas</button>
+      <button class="btn" onclick="loadProveedores('Stretch')"><i class="fa-solid fa-box-open" style="color: #06b6d4;"></i> Film Stretch</button>
     </div>
 
     <!-- 4. PROVEEDOR -->
     <div id="s-proveedor" class="screen">
-      <h2>Proveedor</h2>
+      <div id="dynamicProvBtns"></div>
       
-      <div id="provTarimasBtns" class="hidden">
-        <button class="btn" onclick="setProv('Tucumán Pallet')">Tucumán Pallet</button>
-        <button class="btn" onclick="setProv('Gianni')">Gianni</button>
-        <button class="btn btn-outline" onclick="mostrarOtroProv()"><i class="fa-solid fa-plus"></i> Ingresar otro</button>
-      </div>
-      
-      <div id="provStretchBtns" class="hidden">
-        <button class="btn" onclick="setProv('Urflex')">Urflex</button>
-        <button class="btn btn-outline" onclick="mostrarOtroProv()"><i class="fa-solid fa-plus"></i> Ingresar otro</button>
+      <!-- Lógica especial Tucumán/Chivilisco -->
+      <button class="btn hidden" id="btnTucChiv" onclick="showSubTucChiv()">Tucumán Pallet / Chivilisco</button>
+      <div id="subTucChiv" class="hidden" style="margin-left: 20px; border-left: 2px solid var(--primary); padding-left: 10px;">
+        <button class="btn" onclick="selectProv('Tucumán Pallet', 'Tucumán Pallet')">Tucumán Pallet</button>
+        <button class="btn" onclick="selectProv('Tucumán Pallet', 'Chivilisco')">Chivilisco</button>
       </div>
 
+      <button class="btn" onclick="document.getElementById('divOtroProv').classList.remove('hidden')"><i class="fa-solid fa-list"></i> Otros</button>
       <div id="divOtroProv" class="hidden" style="margin-top: 15px;">
-        <input type="text" id="inputOtroProv" placeholder="Escriba la razón social">
-        <button class="btn btn-primary" onclick="setProv(document.getElementById('inputOtroProv').value)">Confirmar <i class="fa-solid fa-check"></i></button>
+        <select id="selectOtroProv"></select>
+        <button class="btn btn-primary" onclick="selectOtroProv()"><i class="fa-solid fa-check"></i> Confirmar Selección</button>
       </div>
     </div>
 
     <!-- 5. CANTIDAD -->
     <div id="s-cantidad" class="screen">
-      <h2 id="lblCantidad">Cantidad</h2>
-      
-      <!-- Botones predefinidos para Tarimas -->
-      <div id="botonesTarimas" class="grid-2 hidden">
-        <button class="btn" onclick="setCant(500)">500</button>
-        <button class="btn" onclick="setCant(600)">600</button>
-        <button class="btn" onclick="setCant(1400)">1400</button>
-        <button class="btn btn-outline" onclick="mostrarManualCant()"><i class="fa-solid fa-keyboard"></i> Otro</button>
-      </div>
+      <div class="grid-2" id="dynamicCantBtns"></div>
 
-      <!-- Input Manual -->
-      <div id="divCantManual" class="hidden">
+      <button class="btn" onclick="document.getElementById('divCantManual').classList.remove('hidden')"><i class="fa-solid fa-keyboard"></i> Ingreso Manual</button>
+      
+      <div id="divCantManual" class="hidden" style="margin-top: 15px;">
         <input type="number" id="inputCant" placeholder="Cantidad (Unidades/Kg)" inputmode="decimal">
-        <input type="number" id="inputBobinas" class="hidden" placeholder="Cantidad Bobinas (Opcional)" inputmode="decimal">
-        <button class="btn btn-primary" onclick="guardarCantManual()">Siguiente <i class="fa-solid fa-arrow-right"></i></button>
+        <input type="number" id="inputBobinas" class="hidden" placeholder="Cantidad Bobinas" inputmode="decimal">
+        <button class="btn btn-primary" onclick="guardarCantManual()">Confirmar Cantidad</button>
       </div>
     </div>
 
-    <!-- 6. FOTO (OPCIONAL) -->
+    <!-- 6. FOTO -->
     <div id="s-foto" class="screen">
-      <h2>Evidencia de Remito</h2>
-      <p class="subtitle">La fotografía del documento es opcional.</p>
-      
       <input type="file" id="inputFile" accept="image/*" capture="environment" class="hidden" onchange="previewFile()">
       <button class="btn" onclick="document.getElementById('inputFile').click()"><i class="fa-solid fa-camera"></i> Tomar Fotografía</button>
-      
       <img id="imgPreview" class="hidden">
       
-      <button class="btn btn-primary hidden" id="btnOkFoto" onclick="avanzarADetalles()"><i class="fa-solid fa-check"></i> Usar esta foto</button>
-      <button class="btn btn-outline" id="btnOmitirFoto" onclick="omitirFoto()"><i class="fa-solid fa-forward-step"></i> Omitir paso</button>
+      <button class="btn btn-primary hidden" id="btnOkFoto" onclick="nav('s-detalles', 'Detalles Finales')"><i class="fa-solid fa-check"></i> Utilizar Foto</button>
+      <button class="btn" id="btnOmitirFoto" onclick="omitirFoto()">Omitir Evidencia</button>
     </div>
 
     <!-- 7. DETALLES -->
     <div id="s-detalles" class="screen">
-      <h2>Finalizar Registro</h2>
-      <label style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600; padding-left: 5px;">Nº de Remito</label>
-      <input type="text" id="valRemito" placeholder="Ej: 0000-123456">
+      <label style="font-size: 0.9rem; font-weight: 600;">Nº de Remito</label>
+      <input type="text" id="valRemito">
       
-      <label style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600; padding-left: 5px;">Fecha Operación</label>
+      <label style="font-size: 0.9rem; font-weight: 600;">Fecha Operación</label>
       <input type="date" id="valFecha">
       
-      <label style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600; padding-left: 5px;">Observaciones (Opcional)</label>
-      <input type="text" id="valObs" placeholder="Anotaciones...">
+      <label style="font-size: 0.9rem; font-weight: 600;">Observaciones</label>
+      <input type="text" id="valObs">
       
-      <button class="btn btn-success" onclick="enviarDatos()"><i class="fa-solid fa-cloud-arrow-up"></i> Guardar en Base de Datos</button>
+      <button class="btn btn-success" onclick="enviarDatos()"><i class="fa-solid fa-cloud-arrow-up"></i> Registrar Movimiento</button>
     </div>
 
   </div>
 
   <script>
     // ⚠️ REEMPLAZAR POR LA URL DE APPS SCRIPT
-    const API_URL = "https://script.google.com/macros/s/AKfycbzM9LjJ-CJiEbUS0gs42KVmRx0ZnDsJrl1kd7vSeUORJe3T3NXrLX2CRp8RnEDwiiQ0/exec";
+    const API_URL = "AQUI_LA_URL_DE_TU_WEB_APP";
 
-    let db = { password: '', movimiento: '', tipo: '', proveedor: '', cantidad: '', cantBobinas: '', fotoBase64: '', fileName: '', remito: '', fecha: '', obs: '' };
+    let db = { password: '', movimiento: '', tipo: '', proveedor: '', proveedorBusqueda: '', cantidad: '', cantBobinas: '', fotoBase64: '', fileName: '', remito: '', fecha: '', obs: '' };
+    let historyStack = [];
 
-    function nav(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
+    // Lógica ENTER Login
+    document.getElementById('pass').addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); });
+
+    function toggleLoader(state) { document.getElementById('loader').classList.toggle('hidden', !state); }
+
+    function nav(id, title) {
+      if (historyStack.length > 0) document.getElementById(historyStack[historyStack.length - 1].id).classList.remove('active');
+      historyStack.push({ id: id, title: title });
+      renderScreen();
     }
 
-    function toggleLoader(state) {
-      document.getElementById('loader').classList.toggle('hidden', !state);
+    function goBack() {
+      if (historyStack.length <= 1) return;
+      document.getElementById(historyStack.pop().id).classList.remove('active');
+      renderScreen();
     }
+
+    function renderScreen() {
+      const current = historyStack[historyStack.length - 1];
+      document.getElementById(current.id).classList.add('active');
+      if (current.id === 's-login') {
+        document.getElementById('appHeader').classList.add('hidden');
+      } else {
+        document.getElementById('appHeader').classList.remove('hidden');
+        document.getElementById('screenTitle').innerText = current.title;
+      }
+    }
+
+    // Inicialización
+    historyStack.push({ id: 's-login', title: '' });
 
     function login() {
-      const p = document.getElementById('pass').value;
-      if (p === 'GMP2026') { db.password = p; nav('s-movimiento'); } 
-      else { alert('Credenciales inválidas.'); }
+      if (document.getElementById('pass').value === 'GMP2026') {
+        db.password = 'GMP2026';
+        nav('s-movimiento', 'Tipo de Operación');
+      } else {
+        alert('Credenciales denegadas.');
+      }
     }
 
     function setMovimiento(val) {
       db.movimiento = val;
-      nav('s-tipo');
+      nav('s-tipo', 'Insumo');
     }
 
-    function setTipo(val) {
-      db.tipo = val;
+    function loadProveedores(tipo) {
+      db.tipo = tipo;
       if (db.movimiento === 'Envío') {
         db.proveedor = 'Envío';
-        armarCantidad();
-      } else {
-        armarProveedor();
+        db.proveedorBusqueda = 'Envío';
+        return extractStats();
       }
+
+      toggleLoader(true);
+      fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "getProveedores", tipo: tipo }) })
+      .then(r => r.json())
+      .then(data => {
+        toggleLoader(false);
+        if (!data.exito) return alert("Error backend: " + data.mensaje);
+        
+        const container = document.getElementById('dynamicProvBtns');
+        container.innerHTML = '';
+        data.top.forEach(p => {
+          container.innerHTML += `<button class="btn" onclick="selectProv('${p}', '${p}')">${p}</button>`;
+        });
+
+        document.getElementById('btnTucChiv').classList.toggle('hidden', tipo !== 'Tarimas');
+        document.getElementById('subTucChiv').classList.add('hidden');
+        document.getElementById('divOtroProv').classList.add('hidden');
+
+        const select = document.getElementById('selectOtroProv');
+        select.innerHTML = '<option value="">Seleccionar...</option>';
+        data.todos.forEach(p => {
+          if (!data.top.includes(p) && p !== 'Tucumán Pallet' && p !== 'Chivilisco') {
+            select.innerHTML += `<option value="${p}">${p}</option>`;
+          }
+        });
+
+        nav('s-proveedor', 'Proveedor');
+      }).catch(() => { toggleLoader(false); alert("Fallo de red."); });
     }
 
-    function armarProveedor() {
-      document.getElementById('provTarimasBtns').classList.add('hidden');
-      document.getElementById('provStretchBtns').classList.add('hidden');
-      document.getElementById('divOtroProv').classList.add('hidden');
-      
-      if(db.tipo === 'Tarimas') document.getElementById('provTarimasBtns').classList.remove('hidden');
-      else document.getElementById('provStretchBtns').classList.remove('hidden');
-      nav('s-proveedor');
+    function showSubTucChiv() {
+      document.getElementById('subTucChiv').classList.remove('hidden');
     }
 
-    function mostrarOtroProv() { document.getElementById('divOtroProv').classList.remove('hidden'); }
-
-    function setProv(val) {
-      if(!val.trim()) return;
-      db.proveedor = val.trim();
-      armarCantidad();
+    function selectOtroProv() {
+      const val = document.getElementById('selectOtroProv').value;
+      if (!val) return;
+      selectProv(val, val);
     }
 
-    function armarCantidad() {
-      document.getElementById('botonesTarimas').classList.add('hidden');
-      document.getElementById('divCantManual').classList.add('hidden');
-      document.getElementById('inputBobinas').classList.add('hidden');
-
-      if (db.tipo === 'Tarimas') {
-        document.getElementById('lblCantidad').innerText = 'Cantidad de Tarimas';
-        document.getElementById('botonesTarimas').classList.remove('hidden');
-      } else {
-        document.getElementById('lblCantidad').innerText = 'Cantidad de Stretch';
-        document.getElementById('divCantManual').classList.remove('hidden');
-        document.getElementById('inputBobinas').classList.remove('hidden');
-      }
-      nav('s-cantidad');
+    function selectProv(registro, busqueda) {
+      db.proveedor = registro;
+      db.proveedorBusqueda = busqueda;
+      extractStats();
     }
 
-    function mostrarManualCant() { document.getElementById('divCantManual').classList.remove('hidden'); }
+    function extractStats() {
+      toggleLoader(true);
+      fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "getStats", tipo: db.tipo, proveedorBusqueda: db.proveedorBusqueda }) })
+      .then(r => r.json())
+      .then(data => {
+        toggleLoader(false);
+        if (!data.exito) return alert("Error backend: " + data.mensaje);
+
+        const container = document.getElementById('dynamicCantBtns');
+        container.innerHTML = '';
+        data.cantidades.forEach(c => {
+          container.innerHTML += `<button class="btn" onclick="setCant(${c})">${c}</button>`;
+        });
+
+        document.getElementById('valRemito').value = data.remito;
+        document.getElementById('inputBobinas').classList.toggle('hidden', db.tipo === 'Tarimas');
+        document.getElementById('divCantManual').classList.add('hidden');
+
+        nav('s-cantidad', 'Cantidad');
+      }).catch(() => { toggleLoader(false); alert("Fallo de red."); });
+    }
 
     function setCant(val) {
       db.cantidad = val;
-      nav('s-foto');
+      nav('s-foto', 'Evidencia');
     }
 
     function guardarCantManual() {
       const c = document.getElementById('inputCant').value;
-      if(!c || c <= 0) return alert('Valor numérico inválido.');
+      if (!c || c <= 0) return alert('Valor numérico inválido.');
       db.cantidad = c;
-      if(db.tipo === 'Stretch') db.cantBobinas = document.getElementById('inputBobinas').value;
-      nav('s-foto');
+      if (db.tipo === 'Stretch') db.cantBobinas = document.getElementById('inputBobinas').value;
+      nav('s-foto', 'Evidencia');
     }
 
     function previewFile() {
       const file = document.getElementById('inputFile').files[0];
-      if(!file) return;
+      if (!file) return;
       db.fileName = file.name;
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -254,12 +290,8 @@
 
     function omitirFoto() {
       db.fotoBase64 = "";
-      avanzarADetalles();
-    }
-
-    function avanzarADetalles() {
       document.getElementById('valFecha').valueAsDate = new Date();
-      nav('s-detalles');
+      nav('s-detalles', 'Detalles Finales');
     }
 
     function enviarDatos() {
@@ -267,27 +299,16 @@
       db.fecha = document.getElementById('valFecha').value;
       db.obs = document.getElementById('valObs').value.trim();
 
-      if(!db.remito) return alert('El número de remito es obligatorio.');
+      if (!db.remito) return alert('Atributo requerido: Nº Remito.');
       
       toggleLoader(true);
-      fetch(API_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: "procesarCarga", payload: db })
-      })
+      fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "procesarCarga", payload: db }) })
       .then(r => r.json())
       .then(data => {
         toggleLoader(false);
-        if (data.exito) {
-          alert('Registro completado.');
-          location.reload(); 
-        } else {
-          alert('Error: ' + data.mensaje);
-        }
-      })
-      .catch(e => {
-        toggleLoader(false);
-        alert('Fallo de red al conectar con el servidor.');
-      });
+        if (data.exito) { alert('Transacción registrada.'); location.reload(); }
+        else { alert('Error: ' + data.mensaje); }
+      }).catch(() => { toggleLoader(false); alert('Fallo de red.'); });
     }
   </script>
 </body>
