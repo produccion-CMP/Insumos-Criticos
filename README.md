@@ -2,7 +2,7 @@
 
 Aplicación web para controlar el stock y el consumo de **Tarimas, Stretch, Gasoil y Cal** de Cerámica Marcos Paz – Planta Cevil.
 
-- **Frontend:** `index.html`, `styles.css`, `app.js`, `config.js`. Se publica en GitHub Pages.
+- **Frontend:** `index.html`, `styles.css`, `datos.js` (lectura, cálculos y KPI), `app.js` (interfaz), `config.js` e `img/logo-cmp.png`. Se publica en GitHub Pages. Usa el mismo sistema visual que Control de Tierra y Cronograma de Producción: tipografía Plus Jakarta Sans, acento naranja, tema claro y oscuro, navegación inferior en el celular, ilustraciones de nivel de stock por insumo y emojis.
 - **Backend:** `apps-script/Code.gs`. Es una aplicación web de Google Apps Script que lee y escribe las planillas existentes, sin migrar datos:
   - **Stock Insumos Criticos CEVIL** (`1_K4PKO4AyTwxDi5Wd0q01Zyl8ygfVwreZC3lxRXymb0`): tarimas, stretch, cal, necesidades y proveedores.
   - **Combustible CMP** (`1sTkNFSECHyJgY_-ZwaqZDWCF35-tUOajcSL1JFUINzU`): gasoil (DetalleCevil, Control_Diaro y Cargas_y_Ajustes).
@@ -50,7 +50,7 @@ Cada vez que cambies `Code.gs`, hacé *Implementar → Administrar implementacio
 
 ### 2. Frontend (GitHub Pages)
 
-1. Creá el repositorio (por ejemplo `produccion-CMP/InsumosCriticos`) y subí `index.html`, `styles.css`, `app.js`, `config.js` y `README.md`. **No subas datos ni claves.**
+1. En el repositorio `produccion-CMP/Insumos-Criticos` subí `index.html`, `styles.css`, `datos.js`, `app.js`, `config.js`, `README.md` y la carpeta `img/`. **No subas datos ni claves.**
 2. En `config.js` podés dejar la URL de `/exec` en `SCRIPT_URL`. La clave **no** debe ir al repositorio: cada usuario la carga una sola vez en *Parámetros → Conexión* y queda guardada en su navegador.
 3. En *Settings → Pages*, elegí *Deploy from a branch*, rama `main` y carpeta `/ (root)`.
 

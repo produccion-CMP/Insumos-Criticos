@@ -1,185 +1,72 @@
 <!DOCTYPE html>
 <html lang="es-AR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0b4f8a">
-<title>Insumos Críticos · Planta Cevil</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b4f8a'/%3E%3Cpath d='M7 22h18M9 22V12l7-4 7 4v10' stroke='white' stroke-width='2.4' fill='none' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-<script src="config.js" defer></script>
-<script src="app.js" defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#d96b3a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Insumos Críticos · CEVIL</title>
+  <link rel="icon" href="img/logo-cmp.png">
+  <link rel="apple-touch-icon" href="img/logo-cmp.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    (function () {
+      try {
+        var t = JSON.parse(localStorage.getItem('ic_tema') || 'null');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="config.js" defer></script>
+  <script src="datos.js" defer></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <div class="logo" aria-hidden="true">IC</div>
-    <div>
-      <h1>Insumos Críticos</h1>
-      <p class="sub" id="planta"></p>
-    </div>
+  <div id="splash">
+    <span class="logo-tile"><img src="img/logo-cmp.png" alt=""></span>
+    <div class="orbita" aria-hidden="true"><span>🪵</span><span>🧻</span><span>⛽</span><span>🪣</span></div>
+    <h2>Insumos Críticos</h2>
+    <p id="splashTxt">Contando tarimas…</p>
+    <div class="barra"><span></span></div>
   </div>
-  <div class="top-actions">
-    <span class="estado" id="estado">Sin datos</span>
-    <button class="btn ghost" id="btnRefrescar" type="button" title="Actualizar datos">↻ Actualizar</button>
-  </div>
-</header>
+  <div id="toploader"><span></span></div>
 
-<nav class="tabs" id="tabs" role="tablist">
-  <button role="tab" data-tab="resumen" class="activo">Resumen</button>
-  <button role="tab" data-tab="tarimas">Tarimas</button>
-  <button role="tab" data-tab="stretch">Stretch</button>
-  <button role="tab" data-tab="gasoil">Gasoil</button>
-  <button role="tab" data-tab="cal">Cal</button>
-  <button role="tab" data-tab="registrar">Registrar</button>
-  <button role="tab" data-tab="movimientos">Movimientos</button>
-  <button role="tab" data-tab="parametros">Parámetros</button>
-</nav>
+  <header class="top">
+    <a class="brand" href="#/resumen">
+      <span class="logo-tile"><img src="img/logo-cmp.png" alt=""></span>
+      <div>Insumos Críticos<small>Tarimas · Stretch · Gasoil · Cal</small></div>
+    </a>
+    <nav class="nav" id="nav" aria-label="Secciones"></nav>
+    <div class="top-right">
+      <div class="reloj" id="reloj" title="Turno actual">
+        <b id="relojHora">--:--</b>
+        <div><span class="turno" id="relojTurno">T-</span><small id="relojRango"></small><i><span id="relojAvance"></span></i></div>
+      </div>
+      <span class="estado-red" id="red"><i></i><span>Conectando</span></span>
+      <button class="btn ghost icon" id="btnRefrescar" title="Actualizar datos" aria-label="Actualizar datos">🔄</button>
+      <button class="btn ghost icon" id="btnTema" title="Cambiar tema claro u oscuro" aria-label="Cambiar tema">🌙</button>
+    </div>
+  </header>
 
-<main>
-  <section id="tab-resumen" class="tab activo">
-    <div class="sec-head">
-      <h2>Estado actual</h2>
-      <p class="nota" id="resumenNota"></p>
-    </div>
-    <div class="cards-estado" id="cardsEstado"></div>
-    <div class="grid-2">
-      <div class="panel">
-        <h3>Cobertura de stock [días]</h3>
-        <div class="chart-box h260"><canvas id="chCobertura"></canvas></div>
-      </div>
-      <div class="panel">
-        <h3>Consumo de los últimos 30 días vs. 30 días previos</h3>
-        <div class="tabla-wrap"><table class="tabla" id="tablaTendencia"></table></div>
-      </div>
-    </div>
-    <div class="panel">
-      <h3>Alertas</h3>
-      <ul class="alertas" id="listaAlertas"></ul>
-    </div>
-  </section>
+  <main id="app"></main>
+  <nav class="bottom-nav" id="bnav" aria-label="Secciones"></nav>
+  <div id="toasts" aria-live="polite"></div>
 
-  <section id="tab-insumo" class="tab">
-    <div class="sec-head">
-      <h2 id="insTitulo"></h2>
-      <div class="periodos" id="periodos" role="group" aria-label="Período">
-        <button data-per="hist">Histórico</button>
-        <button data-per="u365">Últimos 365 días</button>
-        <button data-per="ytd">Año en curso vs. anterior</button>
-        <button data-per="trim">Último trimestre cerrado</button>
-      </div>
-      <p class="nota" id="insRango"></p>
-    </div>
-    <div class="kpis" id="insKpis"></div>
-    <div class="grid-2">
-      <div class="panel">
-        <h3 id="tStock">Evolución del stock</h3>
-        <div class="chart-box h300"><canvas id="chStock"></canvas></div>
-      </div>
-      <div class="panel">
-        <h3 id="tMensual">Consumo diario promedio por mes</h3>
-        <div class="chart-box h300"><canvas id="chMensual"></canvas></div>
-      </div>
-    </div>
-    <div id="insEspecifico"></div>
-  </section>
-
-  <section id="tab-registrar" class="tab">
-    <div class="sec-head">
-      <h2>Registrar movimiento</h2>
-      <p class="nota">Los datos se escriben en las planillas «Stock Insumos Criticos CEVIL» y «Combustible CMP».</p>
-    </div>
-    <form class="panel form" id="formRegistro" autocomplete="off">
-      <div class="fila-campos">
-        <label>Insumo
-          <select id="fInsumo" required>
-            <option value="tarimas">Tarimas</option>
-            <option value="stretch">Stretch</option>
-            <option value="gasoil">Gasoil</option>
-            <option value="cal">Cal</option>
-          </select>
-        </label>
-        <label>Operación
-          <select id="fOperacion" required></select>
-        </label>
-        <label>Registrado por
-          <input id="fUsuario" type="text" maxlength="60" placeholder="Nombre y apellido" required>
-        </label>
-      </div>
-      <p class="ayuda" id="fAyuda"></p>
-      <div class="fila-campos" id="camposDinamicos"></div>
-      <p class="preview" id="fPreview"></p>
+  <dialog id="dlg">
+    <form method="dialog">
+      <div class="dlg-ico">🗑️</div>
+      <p id="dlgTexto"></p>
       <div class="acciones">
-        <button class="btn" type="submit" id="btnGuardar">Guardar</button>
-        <button class="btn ghost" type="reset">Limpiar</button>
+        <button class="btn" value="no">Cancelar</button>
+        <button class="btn pri dan-pri" value="si">Confirmar</button>
       </div>
     </form>
-    <div class="panel">
-      <h3>Últimos registros del insumo</h3>
-      <div class="tabla-wrap"><table class="tabla" id="tablaUltimos"></table></div>
-    </div>
-  </section>
-
-  <section id="tab-movimientos" class="tab">
-    <div class="sec-head">
-      <h2>Movimientos</h2>
-      <div class="filtros">
-        <label>Insumo
-          <select id="mInsumo">
-            <option value="tarimas">Tarimas</option>
-            <option value="stretch">Stretch</option>
-            <option value="gasoil">Gasoil</option>
-            <option value="cal">Cal</option>
-          </select>
-        </label>
-        <label>Desde <input type="date" id="mDesde"></label>
-        <label>Hasta <input type="date" id="mHasta"></label>
-        <label>Buscar <input type="search" id="mBuscar" placeholder="Proveedor, remito, obs."></label>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="tabla-wrap"><table class="tabla" id="tablaMovs"></table></div>
-      <p class="nota" id="movsNota"></p>
-    </div>
-  </section>
-
-  <section id="tab-parametros" class="tab">
-    <div class="sec-head">
-      <h2>Parámetros de reposición</h2>
-      <p class="nota">Stock de seguridad = días SS × consumo medio. Punto de pedido = días PP × consumo medio. Se guardan en la hoja «Necesidades».</p>
-    </div>
-    <div class="panel">
-      <div class="tabla-wrap"><table class="tabla" id="tablaParams"></table></div>
-    </div>
-    <div class="panel">
-      <h3>Conexión</h3>
-      <form class="form" id="formConexion" autocomplete="off">
-        <div class="fila-campos">
-          <label class="ancho">URL de la aplicación web de Apps Script
-            <input id="cUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
-          </label>
-          <label>Clave de acceso
-            <input id="cKey" type="password" placeholder="Opcional">
-          </label>
-        </div>
-        <div class="acciones">
-          <button class="btn" type="submit">Guardar y probar</button>
-        </div>
-      </form>
-    </div>
-  </section>
-</main>
-
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<dialog id="dlg">
-  <form method="dialog">
-    <p id="dlgTexto"></p>
-    <div class="acciones">
-      <button class="btn ghost" value="no">Cancelar</button>
-      <button class="btn peligro" value="si">Confirmar</button>
-    </div>
-  </form>
-</dialog>
+  </dialog>
 </body>
 </html>

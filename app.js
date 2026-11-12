@@ -1,431 +1,403 @@
 'use strict';
 
-const CONF = Object.assign({ SCRIPT_URL: '', API_KEY: '', PLANTA: '' }, window.APP_CONFIG || {});
+const VISTAS = [
+  { id: 'resumen', e: '🏠', n: 'Inicio' },
+  { id: 'tarimas', e: '🪵', n: 'Tarimas' },
+  { id: 'stretch', e: '🧻', n: 'Stretch' },
+  { id: 'gasoil', e: '⛽', n: 'Gasoil' },
+  { id: 'cal', e: '🪣', n: 'Cal' },
+  { id: 'registrar', e: '➕', n: 'Registrar' },
+  { id: 'movimientos', e: '🧾', n: 'Movimientos' },
+  { id: 'parametros', e: '⚙️', n: 'Ajustes' }
+];
+const BNAV = [
+  { id: 'resumen', e: '🏠', n: 'Inicio' },
+  { id: 'insumo', e: '📦', n: 'Insumos' },
+  { id: 'registrar', e: '➕', n: 'Registrar' },
+  { id: 'movimientos', e: '🧾', n: 'Movim.' },
+  { id: 'parametros', e: '⚙️', n: 'Ajustes' }
+];
+const PERIODOS_UI = [
+  { id: 'hist', e: '📚', n: 'Histórico' },
+  { id: 'u365', e: '📅', n: 'Últimos 365 días' },
+  { id: 'ytd', e: '🗓️', n: 'Año vs. anterior' },
+  { id: 'trim', e: '📊', n: 'Último trimestre' }
+];
+const ESTADO = { ok: '🟢 Normal', warn: '🟠 Pedir', bad: '🔴 Crítico', na: '⚪ Sin datos' };
+const FRASES = ['Contando tarimas…', 'Midiendo la cisterna…', 'Pesando bobinas de stretch…', 'Apilando bolsas de cal…', 'Calculando coberturas…'];
+const DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-const LS = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-};
+const cv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const colorIns = id => cv('--c-' + id);
+const colorEst = e => cv({ ok: '--ok', warn: '--warn', bad: '--bad', na: '--muted' }[e] || '--muted');
+const alfa = (hex, a) => { const h = hex.replace('#', ''); if (h.length !== 6) return hex; return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`; };
+const app = () => $('app');
 
-const conexion = () => ({ url: LS.get('ic_url', '') || CONF.SCRIPT_URL, key: LS.get('ic_key', '') || CONF.API_KEY });
-
-const INSUMOS = {
-  tarimas: { nombre: 'Tarimas', u: 'u', uLarga: 'tarimas', dec: 0, color: '#a0522d', medio: { metodo: 'mediana', dias: 120 }, defSS: 7, defPP: 21, necesidad: 'Tarimas' },
-  stretch: { nombre: 'Stretch', u: 'kg', uLarga: 'kg', dec: 1, color: '#0270ba', medio: { metodo: 'mediana', dias: 120 }, defSS: 12, defPP: 25, necesidad: 'Stretch' },
-  gasoil: { nombre: 'Gasoil', u: 'L', uLarga: 'litros', dec: 0, color: '#3d8b37', medio: { metodo: 'promedio', dias: 90 }, defSS: 3, defPP: 7, necesidad: 'Gasoil' },
-  cal: { nombre: 'Cal', u: 'bolsas', uLarga: 'bolsas', dec: 0, color: '#7a8592', medio: { metodo: 'mediana', dias: 21 }, defSS: 3, defPP: 7, necesidad: 'Cal' }
-};
-const ORDEN = ['tarimas', 'stretch', 'gasoil', 'cal'];
-const PALETA = ['#0270ba', '#3d8b37', '#d98e1f', '#b01917', '#6a4c93', '#8c949c', '#1b9aaa', '#a0522d'];
-
-const ST = { datos: null, modelo: null, tab: 'resumen', insumo: 'tarimas', per: 'hist', charts: {} };
-
-const nf = {};
-function fmt(v, dec = 0) {
-  if (v === null || v === undefined || !isFinite(v)) return '—';
-  const k = 'd' + dec;
-  if (!nf[k]) nf[k] = new Intl.NumberFormat('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  return nf[k].format(v);
-}
-const pct = v => (v === null || v === undefined || !isFinite(v)) ? '—' : fmt(v, 1) + ' %';
-const delta = v => (v === null || v === undefined || !isFinite(v)) ? '—' : (v > 0 ? '+' : '') + fmt(v, 1) + ' %';
-const dClase = v => (v === null || !isFinite(v)) ? '' : (v > 0 ? 'up' : 'dn');
-const fFecha = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4) : '—';
-const dn = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5;
-const isoDn = d => new Date(d * 864e5).toISOString().slice(0, 10);
-const sumar = (a, k) => a.reduce((s, r) => s + (Number(k ? r[k] : r) || 0), 0);
-const mediana = a => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-const percentil = (a, p) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))]; };
-const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const $ = id => document.getElementById(id);
-const hoyLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
-const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const fMes = m => MESES[+m.slice(5, 7) - 1] + ' ' + m.slice(2, 4);
-
-function toast(msg, error) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.className = 'toast ver' + (error ? ' error' : '');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => { t.className = 'toast' + (error ? ' error' : ''); }, error ? 6000 : 3500);
+function toast(msg, tipo) {
+  const t = document.createElement('div');
+  const ic = { ok: '✅', bad: '❌', warn: '⚠️' }[tipo] || 'ℹ️';
+  t.className = 'toast ' + (tipo || '');
+  t.innerHTML = `<span class="ic">${ic}</span><span>${esc(msg)}</span>`;
+  $('toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('sale'); setTimeout(() => t.remove(), 320); }, tipo === 'bad' ? 6500 : 3800);
 }
 
-function confirmar(texto) {
+function confirmar(texto, ico) {
   return new Promise(res => {
     const d = $('dlg');
     $('dlgTexto').textContent = texto;
+    d.querySelector('.dlg-ico').textContent = ico || '🗑️';
     d.returnValue = '';
     d.onclose = () => res(d.returnValue === 'si');
     d.showModal();
   });
 }
 
-async function apiGet() {
-  const { url, key } = conexion();
-  if (!url) throw new Error('Configurá la URL de Apps Script en la pestaña Parámetros');
-  const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key || '') + '&t=' + Date.now());
-  const j = await r.json();
-  if (!j.ok) throw new Error(j.error || 'Error al leer los datos');
-  return j.data;
+function loader(on) { $('toploader').classList.toggle('on', !!on); }
+
+function estadoRed(tipo, txt) {
+  const r = $('red');
+  r.className = 'estado-red' + (tipo === 'off' ? ' off' : tipo === 'cache' ? ' cache' : '');
+  r.querySelector('span').textContent = txt;
 }
 
-async function apiPost(payload) {
-  const { url, key } = conexion();
-  if (!url) throw new Error('Configurá la URL de Apps Script en la pestaña Parámetros');
-  const r = await fetch(url, { method: 'POST', body: JSON.stringify(Object.assign({ key }, payload)) });
-  const j = await r.json();
-  if (!j.ok) throw new Error(j.error || 'No se pudo guardar');
-  return j.msg;
+function moverPill(cont) {
+  if (!cont) return;
+  let pill = cont.querySelector(':scope > .pill');
+  if (!pill) { pill = document.createElement('span'); pill.className = 'pill'; cont.prepend(pill); }
+  const on = cont.querySelector(':scope > .on');
+  if (!on) { pill.style.width = '0'; return; }
+  pill.style.left = on.offsetLeft + 'px';
+  pill.style.width = on.offsetWidth + 'px';
 }
 
-function construirModelo(D) {
-  const M = {};
-  const hoy = D.hoy;
-  const fin = isoDn(dn(hoy) - 1);
-  M.hoy = hoy;
-  M.fin = fin;
-
-  M.tarimas = {
-    serie: D.tarimas.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, env: r[3] || 0, cons: r[4] || 0, desc: r[5] || 0, sist: r[6], ctrl: r[7], consT1: r[8], aj: r[9], stock: r[10] })),
-    movs: D.tarimas.movs.map(r => ({ hoja: 'movTarimas', fila: r[0], f: r[1], cant: r[2], prov: r[3], remito: r[4], obs: r[5], tipo: r[3] === 'Envío' ? 'Envío' : 'Ingreso' })),
-    descarte: D.tarimas.descarte.map(r => ({ hoja: 'descarteTarimas', fila: r[0], f: r[1], cant: r[2], prov: r[3], obs: r[4], tipo: 'Descarte' })),
-    inventario: D.tarimas.inventario.map(r => ({ f: r[0], fis: r[1], sis: r[2] }))
-  };
-
-  M.stretch = {
-    serie: D.stretch.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, ingBob: r[3] || 0, env: r[4] || 0, envBob: r[5] || 0, cons: r[6] || 0, consBob: r[7] || 0, sist: r[8], ctrl: r[9], consT1: r[10], aj: r[11], stock: r[12], stockBob: r[13], consCargado: r[6] !== null })),
-    movs: D.stretch.movs.map(r => ({ hoja: 'movStretch', fila: r[0], f: r[1], cant: r[2], bob: r[3], prov: r[4], remito: r[5], obs: r[6], tipo: r[4] === 'Envío' ? 'Envío' : (r[2] < 0 ? 'Devolución' : 'Ingreso') })),
-    inventario: D.stretch.inventario.map(r => ({ f: r[0], fis: r[1], sis: r[2] }))
-  };
-
-  M.cal = {
-    serie: D.cal.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, env: 0, cons: r[3] || 0, sist: r[4], ctrl: r[5], consT1: r[6], aj: r[7], stock: r[8] })),
-    movs: D.cal.movs.map(r => ({ hoja: 'movCal', fila: r[0], f: r[1], cant: r[2], prov: '', obs: r[3], tipo: 'Ingreso' }))
-  };
-
-  const ultDep = {};
-  D.gasoil.tx.forEach(t => { ultDep[t[2]] = t[3]; });
-  const nomU = u => (u === '#' ? 'Sin identificar (#)' : u);
-  const nomD = d => (d === 'Maquinas cargadoras' ? 'Máquinas cargadoras' : (!d || /^RECUPERADO/i.test(d) ? 'Otros' : d));
-  const tx = D.gasoil.tx.map(t => ({ f: t[0], hora: t[1], u: nomU(t[2]), d: nomD(ultDep[t[2]]), l: t[4], op: t[5] || '(sin operador)', odo: t[6] }));
-  const porDia = {};
-  tx.forEach(t => { porDia[t.f] = (porDia[t.f] || 0) + t.l; });
-  const cd = {};
-  D.gasoil.diario.forEach(r => { cd[r[0]] = r; });
-  const fechas = tx.map(t => t.f).concat(Object.keys(cd)).sort();
-  const serieG = [];
-  if (fechas.length) {
-    for (let d = dn(fechas[0]); d <= dn(hoy); d++) {
-      const f = isoDn(d), r = cd[f];
-      serieG.push({ f, cons: porDia[f] || 0, ing: r ? (r[2] || 0) : 0, env: 0, sonda: r ? r[3] : null, stock: r ? r[6] : null, stockTot: r ? r[5] : null, aj: r && r[3] !== null && r[4] !== null ? r[3] - r[4] - (r[2] || 0) : null, ctrl: r ? r[3] : null });
-    }
-  }
-  M.gasoil = {
-    serie: serieG,
-    tx,
-    movs: D.gasoil.movs.map(r => ({ hoja: 'cargasAjustes', fila: r[0], f: r[1], hora: r[2], tipo: r[3] === 'Carga Gasoil' ? 'Carga cisterna' : (r[3] === 'Medición Sonda' ? 'Medición sonda' : r[3]), valor: r[4], cant: r[3] === 'Carga Gasoil' ? r[4] : r[5], litros: r[5], prov: '', obs: r[6] }))
-  };
-
-  ORDEN.forEach(id => {
-    const ins = M[id];
-    ins.inicio = ins.serie.length ? ins.serie[0].f : hoy;
-    const conStock = ins.serie.filter(r => r.stock !== null && r.stock !== undefined);
-    ins.ultimo = conStock.length ? conStock[conStock.length - 1] : null;
-    ins.medio = consumoMedio(id, ins, hoy);
-    const nec = (D.necesidades || []).find(n => n.insumo.toLowerCase() === INSUMOS[id].necesidad.toLowerCase());
-    ins.diasSS = nec && nec.diasSS ? nec.diasSS : INSUMOS[id].defSS;
-    ins.diasPP = nec && nec.diasPP ? nec.diasPP : INSUMOS[id].defPP;
-    ins.paramGuardado = !!(nec && nec.diasSS && nec.diasPP);
-    ins.ss = ins.medio !== null ? Math.ceil(ins.diasSS * ins.medio) : null;
-    ins.pp = ins.medio !== null ? Math.ceil(ins.diasPP * ins.medio) : null;
-    ins.stock = ins.ultimo ? ins.ultimo.stock : null;
-    ins.cobertura = ins.stock !== null && ins.medio ? ins.stock / ins.medio : null;
-    ins.estado = ins.stock === null || ins.ss === null ? 'na' : (ins.stock < ins.ss ? 'bad' : (ins.stock < ins.pp ? 'warn' : 'ok'));
-  });
-  return M;
+function pintarNav() {
+  const v = ST.vista;
+  const prev = $('nav').querySelector('.pill');
+  const pl = prev ? prev.style.left : '', pw = prev ? prev.style.width : '';
+  $('nav').innerHTML = VISTAS.map(x => `<a href="#/${x.id}" class="${x.id === v ? 'on' : ''}" title="${x.n}"><span class="e">${x.e}</span><span class="tx">${x.n}</span></a>`).join('');
+  $('bnav').innerHTML = BNAV.map(x => {
+    const act = x.id === 'insumo' ? INSUMOS[v] : x.id === v;
+    const href = x.id === 'insumo' ? '#/' + ST.insumo : '#/' + x.id;
+    return `<a href="${href}" class="${act ? 'on' : ''}"><span class="e">${x.id === 'insumo' && INSUMOS[ST.insumo] ? INSUMOS[ST.insumo].emoji : x.e}</span>${x.n}</a>`;
+  }).join('');
+  if (pl) { const p = document.createElement('span'); p.className = 'pill'; p.style.left = pl; p.style.width = pw; $('nav').prepend(p); }
+  requestAnimationFrame(() => requestAnimationFrame(() => moverPill($('nav'))));
 }
 
-function consumoMedio(id, ins, hoy) {
-  const cfg = INSUMOS[id].medio;
-  const desde = isoDn(dn(hoy) - cfg.dias);
-  const s = ins.serie.filter(r => r.f > desde && r.f < hoy);
-  if (!s.length) return null;
-  if (cfg.metodo === 'promedio') return sumar(s, 'cons') / s.length;
-  return mediana(s.map(r => r.cons).filter(v => v > 0));
+function reloj() {
+  const d = new Date();
+  $('relojHora').textContent = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const t = turnoActual(d);
+  $('relojTurno').textContent = 'Turno ' + t.t;
+  $('relojRango').textContent = t.txt;
+  $('relojAvance').style.width = Math.round(100 * t.avance) + '%';
 }
 
-function periodos(fin, inicio) {
-  const y = +fin.slice(0, 4), m = +fin.slice(5, 7), d = +fin.slice(8, 10);
-  const sig = isoDn(dn(fin) + 1);
-  let qy = +sig.slice(0, 4), qn = Math.floor((+sig.slice(5, 7) - 1) / 3) - 1;
-  if (qn < 0) { qn = 3; qy -= 1; }
-  const trim = (yy, n) => { while (n < 0) { n += 4; yy -= 1; } const a = isoDn(Date.UTC(yy, n * 3, 1) / 864e5); const b = isoDn(Date.UTC(yy, n * 3 + 3, 1) / 864e5 - 1); return { a, b, nombre: 'T' + (n + 1) + ' ' + yy }; };
-  const t = trim(qy, qn), tp = trim(qy, qn - 1), ty = trim(qy - 1, qn);
-  const finAnt = isoDn(Math.min(Date.UTC(y - 1, m - 1, d), Date.UTC(y - 1, m, 1) - 864e5) / 864e5);
-  return {
-    hist: { a: inicio, b: fin, nombre: 'Histórico' },
-    u365: { a: isoDn(dn(fin) - 364), b: fin, nombre: 'Últimos 365 días' },
-    ytd: { a: y + '-01-01', b: fin, nombre: y + ' (año en curso)', cmp: 'ytd_ant' },
-    ytd_ant: { a: (y - 1) + '-01-01', b: finAnt, nombre: 'mismo tramo de ' + (y - 1) },
-    trim: { a: t.a, b: t.b, nombre: t.nombre, cmp: 'trim_yoy', cmp2: 'trim_ant' },
-    trim_yoy: Object.assign(ty, {}),
-    trim_ant: Object.assign(tp, {}),
-    u30: { a: isoDn(dn(fin) - 29), b: fin, nombre: 'Últimos 30 días' },
-    p30: { a: isoDn(dn(fin) - 59), b: isoDn(dn(fin) - 30), nombre: '30 días previos' }
-  };
+function temaActual() {
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t) return t;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function movsPeriodo(ins, p) { return (ins.movs || []).filter(m => m.f >= p.a && m.f <= p.b); }
-
-function kpis(id, p) {
-  const ins = ST.modelo[id];
-  const a = p.a < ins.inicio ? ins.inicio : p.a;
-  const dias = dn(p.b) - dn(p.a) + 1;
-  const diasDatos = Math.max(dn(p.b) - dn(a) + 1, 0);
-  const s = ins.serie.filter(r => r.f >= p.a && r.f <= p.b);
-  const cons = sumar(s, 'cons');
-  const consDias = s.map(r => r.cons);
-  while (consDias.length < diasDatos) consDias.push(0);
-  const pos = consDias.filter(v => v > 0);
-  const stocks = s.map(r => r.stock).filter(v => v !== null && v !== undefined);
-  const stockProm = stocks.length ? sumar(stocks) / stocks.length : null;
-  const mv = movsPeriodo(ins, p);
-  const ingresos = id === 'gasoil' ? mv.filter(m => m.tipo === 'Carga cisterna') : mv.filter(m => m.tipo === 'Ingreso' || m.tipo === 'Devolución');
-  const ingTotal = id === 'gasoil' ? sumar(ingresos, 'cant') : sumar(s, 'ing');
-  const entregas = ingresos.filter(m => m.cant > 0).length;
-  const env = sumar(s, 'env');
-  const ctrls = s.filter(r => r.ctrl !== null && r.ctrl !== undefined);
-  const ajustes = s.filter(r => r.aj !== null && r.aj !== undefined);
-  const k = {
-    dias, diasDatos, cons, lDia: diasDatos ? cons / diasDatos : null, lDiaOp: pos.length ? sumar(pos) / pos.length : null,
-    diasConsumo: pos.length, p90: percentil(consDias, 0.9), pico: consDias.length ? Math.max.apply(null, consDias) : null,
-    ingTotal, entregas, entregaProm: entregas ? ingTotal / entregas : null, env,
-    stockProm, stockMin: stocks.length ? Math.min.apply(null, stocks) : null,
-    diasBajoSS: ins.ss !== null ? s.filter(r => r.stock !== null && r.stock !== undefined && r.stock < ins.ss).length : null,
-    diasConStock: stocks.length,
-    rotacion: stockProm ? cons / stockProm : null,
-    coberturaProm: stockProm !== null && diasDatos && cons ? stockProm / (cons / diasDatos) : null,
-    controles: ctrls.length, ajusteTotal: ajustes.length ? sumar(ajustes, 'aj') : null,
-    ajusteAbsProm: ajustes.length ? sumar(ajustes.map(r => Math.abs(r.aj))) / ajustes.length : null
-  };
-  if (id === 'tarimas') {
-    const desc = sumar(s, 'desc');
-    k.descarte = desc;
-    k.descartePct = k.cons ? 100 * desc / (k.cons + desc) : null;
-    const inv = ins.inventario.filter(r => r.f >= p.a && r.f <= p.b && r.sis);
-    k.difInv = inv.length ? 100 * sumar(inv.map(r => r.sis - r.fis)) / sumar(inv, 'sis') : null;
-    k.inventarios = inv.length;
-  }
-  if (id === 'stretch') {
-    const tar = {};
-    ST.modelo.tarimas.serie.forEach(r => { tar[r.f] = r.cons; });
-    const par = s.filter(r => r.cons > 0 && tar[r.f] > 0);
-    k.kgPallet = par.length ? sumar(par, 'cons') / sumar(par.map(r => tar[r.f])) : null;
-    k.grPallet = k.kgPallet !== null ? k.kgPallet * 1000 : null;
-    k.bobDia = k.lDia !== null ? k.lDia / ST.datos.params.kgPorBobina : null;
-    const inv = ins.inventario.filter(r => r.f >= p.a && r.f <= p.b && r.sis);
-    k.difInv = inv.length ? 100 * sumar(inv.map(r => r.sis - r.fis)) / sumar(inv, 'sis') : null;
-    k.inventarios = inv.length;
-    const conKg = ingresos.filter(m => m.cant > 0 && m.bob > 0);
-    k.kgBobina = conKg.length ? sumar(conKg, 'cant') / sumar(conKg, 'bob') : null;
-    k.diasSinConsumoCargado = s.filter(r => !r.consCargado && tar[r.f] > 0).length;
-  }
-  if (id === 'gasoil') {
-    const tx = ins.tx.filter(t => t.f >= p.a && t.f <= p.b);
-    k.despachos = tx.length;
-    k.lDespacho = tx.length ? sumar(tx, 'l') / tx.length : null;
-    k.unidades = new Set(tx.map(t => t.u)).size;
-    k.sinOdo = tx.length ? 100 * tx.filter(t => t.odo === null || t.odo <= 0 || t.odo === 9999 || t.odo === 99999).length / tx.length : null;
-    const noct = sumar(tx.filter(t => { const h = +String(t.hora).slice(0, 2); return h >= 22 || h < 6; }), 'l');
-    k.nocturno = k.cons ? 100 * noct / k.cons : null;
-    const son = s.filter(r => r.aj !== null);
-    k.mediciones = son.length;
-    k.difSonda = son.length ? sumar(son, 'aj') / son.length : null;
-  }
-  return k;
+function alternarTema() {
+  const n = temaActual() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', n);
+  LS.set('ic_tema', n);
+  $('btnTema').textContent = n === 'dark' ? '☀️' : '🌙';
+  render();
 }
-
-function compara(k, kc) { return kc && kc.lDia ? 100 * (k.lDia - kc.lDia) / kc.lDia : null; }
 
 function destruir(id) { if (ST.charts[id]) { ST.charts[id].destroy(); delete ST.charts[id]; } }
+function destruirTodos() { Object.keys(ST.charts).forEach(destruir); }
 
 function grafico(id, cfg) {
   destruir(id);
   const el = $(id);
   if (!el || !window.Chart) return null;
-  Chart.defaults.font.family = getComputedStyle(document.documentElement).fontFamily;
-  Chart.defaults.color = '#5b6670';
+  Chart.defaults.font.family = cv('--font') || 'Plus Jakarta Sans, sans-serif';
+  Chart.defaults.font.weight = 600;
+  Chart.defaults.color = cv('--muted');
+  Chart.defaults.borderColor = cv('--line');
+  Chart.defaults.plugins.tooltip.backgroundColor = cv('--text');
+  Chart.defaults.plugins.tooltip.titleColor = cv('--bg');
+  Chart.defaults.plugins.tooltip.bodyColor = cv('--bg');
+  Chart.defaults.plugins.tooltip.cornerRadius = 10;
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.boxHeight = 8;
   ST.charts[id] = new Chart(el, cfg);
   return ST.charts[id];
 }
 
-const ejeNum = dec => ({ ticks: { callback: v => fmt(v, dec) }, grid: { color: '#edf0f3' } });
+const ejeY = dec => ({ beginAtZero: true, ticks: { callback: v => fmt(v, dec) }, grid: { color: cv('--line') }, border: { display: false } });
+const ejeX = () => ({ grid: { display: false }, border: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } });
 
-function renderResumen() {
+function capacidad(x, id) {
+  if (id === 'gasoil' && ST.datos) return litrosSonda(219) - ST.datos.params.reservaCisterna;
+  return Math.max((x.pp || 0) * 1.5, (x.stock || 0) * 1.1, 1);
+}
+
+function ilus(id, stock, x, extra) {
+  const cap = capacidad(x, id);
+  const fr = Math.max(0, Math.min(1, (stock || 0) / cap));
+  const fSS = x.ss ? Math.min(1, x.ss / cap) : null;
+  const fPP = x.pp ? Math.min(1, x.pp / cap) : null;
+  const pct = Math.round(fr * 100);
+  const uid = id + Math.random().toString(36).slice(2, 7);
+  let cuerpo = '';
+  if (id === 'gasoil') {
+    const y0 = 26, h = 62, top = y0 + h * (1 - fr);
+    const lin = f => f === null ? '' : `<line class="ref ${f === fSS ? 'ss' : 'pp'}" x1="8" x2="104" y1="${y0 + h * (1 - f)}" y2="${y0 + h * (1 - f)}"/>`;
+    cuerpo = `<defs><clipPath id="c${uid}"><rect x="8" y="${y0}" width="96" height="${h}" rx="31"/></clipPath></defs>
+      <rect class="fondo" x="8" y="${y0}" width="96" height="${h}" rx="31"/>
+      <g clip-path="url(#c${uid})"><g class="sube"><rect class="liq" x="0" y="${top}" width="112" height="${y0 + h - top}"/></g>
+      <path class="liq2 ola" d="M-10 ${top} q 10 -5 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 v 8 h -140 z"/></g>
+      <rect class="marco" x="8" y="${y0}" width="96" height="${h}" rx="31"/>
+      ${lin(fPP)}${lin(fSS)}
+      <rect class="marco" x="48" y="17" width="16" height="9" rx="2"/>
+      <line class="marco" x1="26" y1="88" x2="22" y2="100"/><line class="marco" x1="86" y1="88" x2="90" y2="100"/>
+      <text x="56" y="108" text-anchor="middle">${pct} %</text>`;
+  } else if (id === 'stretch') {
+    const y0 = 12, h = 84, top = y0 + h * (1 - fr);
+    const lin = (f, c) => f === null ? '' : `<line class="ref ${c}" x1="24" x2="88" y1="${y0 + h * (1 - f)}" y2="${y0 + h * (1 - f)}"/>`;
+    let rayas = '';
+    for (let i = 1; i < 7; i++) rayas += `<line x1="${30 + i * 7.5}" x2="${30 + i * 7.5}" y1="${y0}" y2="${y0 + h}" stroke="rgba(255,255,255,.25)" stroke-width="1"/>`;
+    cuerpo = `<defs><clipPath id="c${uid}"><rect x="30" y="${y0}" width="52" height="${h}" rx="10"/></clipPath></defs>
+      <rect class="fondo" x="30" y="${y0}" width="52" height="${h}" rx="10"/>
+      <g clip-path="url(#c${uid})"><g class="sube"><rect class="liq" x="20" y="${top}" width="72" height="${y0 + h - top}"/></g>${rayas}</g>
+      <rect class="marco" x="30" y="${y0}" width="52" height="${h}" rx="10"/>
+      <rect class="marco" x="50" y="4" width="12" height="8" rx="2"/><rect class="marco" x="50" y="96" width="12" height="8" rx="2"/>
+      ${lin(fPP, 'pp')}${lin(fSS, 'ss')}
+      <text x="56" y="110" text-anchor="middle">${pct} %</text>`;
+  } else if (id === 'tarimas') {
+    const n = 8, llenas = Math.round(fr * n);
+    for (let i = 0; i < n; i++) {
+      const y = 92 - i * 10.5, on = i < llenas;
+      const cls = on ? 'liq' : 'vacio';
+      cuerpo += `<g class="${on ? 'aparece' : ''}" style="animation-delay:${i * 60}ms"><rect class="${cls}" x="14" y="${y}" width="84" height="4" rx="1.5"/>
+        <rect class="${cls}" x="16" y="${y + 4}" width="10" height="5" rx="1"/><rect class="${cls}" x="51" y="${y + 4}" width="10" height="5" rx="1"/><rect class="${cls}" x="86" y="${y + 4}" width="10" height="5" rx="1"/></g>`;
+    }
+    const ref = (f, c) => f === null ? '' : `<line class="ref ${c}" x1="6" x2="106" y1="${101 - f * n * 10.5}" y2="${101 - f * n * 10.5}"/>`;
+    cuerpo += ref(fPP, 'pp') + ref(fSS, 'ss') + `<text x="56" y="110" text-anchor="middle">${pct} %</text>`;
+  } else {
+    const pos = [[10, 74], [42, 74], [74, 74], [26, 50], [58, 50], [10, 26], [42, 26], [74, 26], [42, 4]];
+    const llenas = Math.round(fr * pos.length);
+    pos.forEach((p, i) => {
+      const on = i < llenas;
+      cuerpo += `<g class="${on ? 'aparece' : ''}" style="animation-delay:${i * 60}ms"><rect class="${on ? 'liq' : 'vacio'}" x="${p[0]}" y="${p[1]}" width="28" height="21" rx="6"/>${on ? `<text x="${p[0] + 14}" y="${p[1] + 14}" text-anchor="middle" style="fill:#fff;font-size:7px">CAL</text>` : ''}</g>`;
+    });
+    cuerpo += `<text x="56" y="110" text-anchor="middle">${pct} %</text>`;
+  }
+  return `<svg class="ilus" viewBox="0 0 112 112" role="img" aria-label="Nivel de stock ${pct} % de la capacidad de referencia"${extra || ''}>${cuerpo}</svg>`;
+}
+
+function fechaLarga(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  return `${DIAS_SEM[d.getDay()]} ${d.getDate()} de ${MESES_L[d.getMonth()]}`;
+}
+
+function vistaResumen() {
   const M = ST.modelo;
-  $('resumenNota').textContent = 'Stock al último día con datos. Consumo medio: mediana de los días con consumo (tarimas y stretch: 120 días; cal: 21 días) y promedio diario de 90 días para gasoil.';
-  const etiqueta = { ok: 'Normal', warn: 'Pedir', bad: 'Bajo stock de seguridad', na: 'Sin datos' };
-  $('cardsEstado').innerHTML = ORDEN.map(id => {
+  const cuenta = { ok: 0, warn: 0, bad: 0, na: 0 };
+  ORDEN.forEach(id => { cuenta[M[id].estado]++; });
+  const chips = ['bad', 'warn', 'ok'].filter(e => cuenta[e]).map(e => `<span class="tag ${{ ok: 't-ok', warn: 't-warn', bad: 't-bad' }[e]}">${ESTADO[e].split(' ')[0]} ${cuenta[e]} ${{ ok: 'normal', warn: 'para pedir', bad: 'crítico' }[e]}${cuenta[e] > 1 && e !== 'warn' ? (e === 'ok' ? 'es' : 's') : ''}</span>`).join('');
+  const cards = ORDEN.map((id, i) => {
     const I = INSUMOS[id], x = M[id];
-    const max = Math.max(x.pp || 0, x.stock || 0) * 1.25 || 1;
-    const w = x.stock !== null ? Math.min(100, 100 * x.stock / max) : 0;
-    const col = { ok: 'var(--ok)', warn: 'var(--warn)', bad: 'var(--bad)', na: 'var(--suave)' }[x.estado];
     const ult = (x.movs || []).filter(m => m.tipo === 'Ingreso' || m.tipo === 'Carga cisterna').slice(-1)[0];
-    const extra = id === 'stretch' && x.ultimo ? ` <small>(${fmt(x.ultimo.stockBob, 0)} bob.)</small>` : '';
-    const ctrl = ultimoControl(x);
-    return `<article class="card-estado ${x.estado}" data-ir="${id}" tabindex="0">
-      <div class="cab"><span class="nom">${I.nombre}</span><span class="pill ${x.estado}">${etiqueta[x.estado]}</span></div>
-      <div class="stock">${fmt(x.stock, 0)} <small>${I.u}</small>${extra}</div>
-      <div class="cob">Cobertura: <b>${fmt(x.cobertura, 1)} días</b></div>
-      <div class="barra" title="Stock vs. stock de seguridad y punto de pedido"><i style="width:${w}%;background:${col}"></i>${x.ss ? `<b style="left:${100 * x.ss / max}%"></b>` : ''}${x.pp ? `<b style="left:${100 * x.pp / max}%"></b>` : ''}</div>
-      <div class="det">
-        <span>Consumo medio</span><span>${fmt(x.medio, I.dec)} ${I.u}/día</span>
-        <span>Stock de seguridad (${fmt(x.diasSS)} d)</span><span>${fmt(x.ss)} ${I.u}</span>
-        <span>Punto de pedido (${fmt(x.diasPP)} d)</span><span>${fmt(x.pp)} ${I.u}</span>
-        <span>Último ingreso</span><span>${ult ? fFecha(ult.f) + ' · ' + fmt(ult.cant, I.dec) : '—'}</span>
-        <span>Último control físico</span><span>${ctrl ? fFecha(ctrl.f) : '—'}</span>
-        <span>Datos al</span><span>${x.ultimo ? fFecha(x.ultimo.f) : '—'}</span>
-      </div>
-    </article>`;
+    return `<article class="card hover ins-card ${x.estado}" style="--c:var(--c-${id});--i:${i}" data-ir="${id}" tabindex="0">
+      <div class="ins-cab"><span class="ins-ico">${I.emoji}</span><div><h3>${I.nombre}</h3><div class="sub">${I.desc}</div></div><span class="tag est-tag">${ESTADO[x.estado]}</span></div>
+      <div class="ins-cuerpo">${ilus(id, x.stock, x)}
+        <div class="ins-num"><div class="v">${fmt(x.stock)}<small>${I.u}</small></div>
+          ${id === 'stretch' && x.ultimo ? `<div class="bob">≈ ${fmt(x.ultimo.stockBob)} bobinas</div>` : ''}
+          <div class="cob">⏳ <b>${fmt(x.cobertura, 1)}</b> días</div></div></div>
+      <div class="ins-spark"><canvas id="sp-${id}"></canvas></div>
+      <div class="ins-pie">
+        <div><span>Consumo/día</span><b>${fmt(x.medio, I.dec)} ${I.u}</b></div>
+        <div><span>Punto pedido</span><b>${fmt(x.pp)} ${I.u}</b></div>
+        <div><span>Último ingreso</span><b>${ult ? fFecha(ult.f).slice(0, 5) + ' · ' + fmt(ult.cant) : '—'}</b></div>
+      </div></article>`;
   }).join('');
-  document.querySelectorAll('[data-ir]').forEach(el => {
-    const ir = () => irTab(el.dataset.ir);
-    el.onclick = ir;
-    el.onkeydown = e => { if (e.key === 'Enter') ir(); };
-  });
 
-  grafico('chCobertura', {
-    type: 'bar',
-    data: {
-      labels: ORDEN.map(id => INSUMOS[id].nombre),
-      datasets: [
-        { label: 'Cobertura actual', order: 1, data: ORDEN.map(id => M[id].cobertura), backgroundColor: ORDEN.map(id => ({ ok: '#2e8540', warn: '#d98e1f', bad: '#c0392b', na: '#8c949c' })[M[id].estado]) },
-        { label: 'Días punto de pedido', order: 0, data: ORDEN.map(id => M[id].diasPP), type: 'line', showLine: false, pointStyle: 'line', pointRadius: 22, pointBorderWidth: 3, borderColor: '#1f2a36' },
-        { label: 'Días stock de seguridad', order: 0, data: ORDEN.map(id => M[id].diasSS), type: 'line', showLine: false, pointStyle: 'line', pointRadius: 22, pointBorderWidth: 3, borderColor: '#c0392b' }
-      ]
-    },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y, 1) + ' días' } } }, scales: { y: ejeNum(0) } }
-  });
+  const maxD = Math.min(60, Math.max.apply(null, ORDEN.map(id => Math.max(M[id].cobertura || 0, M[id].diasPP || 0))) * 1.12) || 30;
+  const cob = ORDEN.map(id => {
+    const x = M[id], I = INSUMOS[id];
+    const w = Math.min(100, 100 * (x.cobertura || 0) / maxD);
+    return `<div class="cob-fila ${x.estado}"><div class="n"><span class="e">${I.emoji}</span>${I.nombre}</div>
+      <div class="cob-pista"><div class="rel" style="width:${w}%"></div>
+      <span class="mk ss" style="left:${100 * x.diasSS / maxD}%" data-l="SS ${x.diasSS} d"></span>
+      <span class="mk pp" style="left:${100 * x.diasPP / maxD}%" data-l="PP ${x.diasPP} d"></span></div>
+      <div class="d">${fmt(x.cobertura, 1)} d</div></div>`;
+  }).join('');
 
   const P = periodos(M.fin, '2000-01-01');
-  $('tablaTendencia').innerHTML = '<thead><tr><th>Insumo</th><th>Últimos 30 d</th><th>30 d previos</th><th>Variación</th><th>Ingresos 30 d</th></tr></thead><tbody>' +
-    ORDEN.map(id => {
-      const k = kpis(id, P.u30), kp = kpis(id, P.p30), d = compara(k, kp), I = INSUMOS[id];
-      return `<tr><td>${I.nombre}</td><td>${fmt(k.lDia, I.dec)} ${I.u}/día</td><td>${fmt(kp.lDia, I.dec)} ${I.u}/día</td><td class="${dClase(d)}">${delta(d)}</td><td>${fmt(k.ingTotal, I.dec)} ${I.u}</td></tr>`;
-    }).join('') + '</tbody>';
+  const tend = ORDEN.map(id => {
+    const k = kpis(id, P.u30), kp = kpis(id, P.p30), d = compara(k, kp), I = INSUMOS[id];
+    const cls = d === null ? 'eq' : Math.abs(d) < 2 ? 'eq' : d > 0 ? 'up' : 'dn';
+    const fl = d === null ? '—' : (cls === 'eq' ? '➡️ ' : cls === 'up' ? '↗️ ' : '↘️ ') + delta(d);
+    return `<div class="tend-fila"><span class="e">${I.emoji}</span><div><b>${fmt(k.lDia, I.dec)} ${I.u}/día</b><div class="sub">Antes: ${fmt(kp.lDia, I.dec)} ${I.u}/día · ingresos ${fmt(k.ingTotal)} ${I.u}</div></div><span class="flecha ${cls}">${fl}</span></div>`;
+  }).join('');
 
-  const al = [];
+  app().innerHTML = `<section class="vista">
+    <div class="hero"><div><div class="eyebrow">${fechaLarga(M.hoy)} · Planta Cevil</div><h1>Insumos <span>críticos</span></h1>
+      <p class="sub">Stock al último registro y cobertura con el consumo medio de cada insumo.</p></div>
+      <div class="resumen-chips">${chips}</div></div>
+    <div class="ins-grid stagger">${cards}</div>
+    <div class="grid g2">
+      <div class="card"><div class="card-h"><div class="t"><h3>⏳ Días de cobertura</h3><span class="sub">Stock actual ÷ consumo medio</span></div></div>
+        <div class="cob-lista">${cob}</div>
+        <div class="cob-ley"><span><i style="background:var(--warn)"></i>Punto de pedido</span><span><i style="background:var(--bad)"></i>Stock de seguridad</span></div></div>
+      <div class="card"><div class="card-h"><div class="t"><h3>📈 Últimos 30 días</h3><span class="sub">Consumo diario contra los 30 días anteriores</span></div></div><div class="tend">${tend}</div></div>
+    </div>
+    <div class="card"><div class="card-h"><div class="t"><h3>🔔 Alertas</h3><span class="sub">Lo que conviene revisar hoy</span></div></div><div class="alertas">${alertas().map((a, i) => `<div class="alerta ${a[0]}" style="animation-delay:${i * 40}ms"><span class="e">${a[1]}</span><span>${esc(a[2])}</span></div>`).join('')}</div></div>
+  </section>`;
+
+  app().querySelectorAll('[data-ir]').forEach(el => {
+    el.onclick = () => { location.hash = '#/' + el.dataset.ir; };
+    el.onkeydown = e => { if (e.key === 'Enter') location.hash = '#/' + el.dataset.ir; };
+  });
+  ORDEN.forEach(id => sparkline(id));
+}
+
+function sparkline(id) {
+  const x = ST.modelo[id];
+  const s = x.serie.filter(r => r.stock !== null && r.stock !== undefined).slice(-60);
+  const c = colorEst(x.estado);
+  grafico('sp-' + id, {
+    type: 'line',
+    data: { labels: s.map(r => fFecha(r.f)), datasets: [
+      { data: s.map(r => r.stock), borderColor: c, borderWidth: 2, pointRadius: 0, fill: true, tension: .25,
+        backgroundColor: ctx => { const { ctx: g, chartArea: a } = ctx.chart; if (!a) return alfa(c, .15); const gr = g.createLinearGradient(0, a.top, 0, a.bottom); gr.addColorStop(0, alfa(c, .35)); gr.addColorStop(1, alfa(c, 0)); return gr; } },
+      { data: s.map(() => x.pp), borderColor: cv('--warn'), borderWidth: 1.2, borderDash: [4, 3], pointRadius: 0 }
+    ] },
+    options: { maintainAspectRatio: false, animation: { duration: 700 }, plugins: { legend: { display: false }, tooltip: { displayColors: false, callbacks: { label: k => (k.datasetIndex ? 'Punto de pedido ' : 'Stock ') + fmt(k.parsed.y) } } }, scales: { x: { display: false }, y: { display: false, beginAtZero: true } }, interaction: { mode: 'index', intersect: false } }
+  });
+}
+
+function alertas() {
+  const M = ST.modelo, al = [];
   ORDEN.forEach(id => {
     const x = M[id], I = INSUMOS[id];
-    if (x.estado === 'bad') al.push(['bad', `${I.nombre}: stock (${fmt(x.stock)} ${I.u}) por debajo del stock de seguridad (${fmt(x.ss)} ${I.u}). Cobertura ${fmt(x.cobertura, 1)} días.`]);
-    else if (x.estado === 'warn') al.push(['warn', `${I.nombre}: stock (${fmt(x.stock)} ${I.u}) por debajo del punto de pedido (${fmt(x.pp)} ${I.u}). Lanzar pedido.`]);
-    if (x.ultimo && dn(M.hoy) - dn(x.ultimo.f) > 2) al.push(['warn', `${I.nombre}: el último dato de stock es del ${fFecha(x.ultimo.f)}.`]);
+    if (x.estado === 'bad') al.push(['bad', '🚨', `${I.nombre}: ${fmt(x.stock)} ${I.u}, por debajo del stock de seguridad (${fmt(x.ss)} ${I.u}). Cobertura de ${fmt(x.cobertura, 1)} días.`]);
+    else if (x.estado === 'warn') al.push(['warn', '🛒', `${I.nombre}: ${fmt(x.stock)} ${I.u}, por debajo del punto de pedido (${fmt(x.pp)} ${I.u}). Lanzar pedido.`]);
+    if (x.ultimo && dn(M.hoy) - dn(x.ultimo.f) > 2) al.push(['warn', '🕒', `${I.nombre}: el último dato de stock es del ${fFecha(x.ultimo.f)}.`]);
     const ctrl = ultimoControl(x);
-    if (!ctrl || dn(M.hoy) - dn(ctrl.f) > 14) al.push(['warn', `${I.nombre}: ${ctrl ? 'el último control físico fue el ' + fFecha(ctrl.f) : 'no hay controles físicos registrados'}.`]);
+    if (!ctrl || dn(M.hoy) - dn(ctrl.f) > 14) al.push(['info', '🔍', `${I.nombre}: ${ctrl ? 'el último control físico fue el ' + fFecha(ctrl.f) : 'no hay controles físicos registrados'}.`]);
   });
-  const st = M.stretch.serie.filter(r => r.f >= isoDn(dn(M.fin) - 13) && r.f <= M.fin);
   const tar = {};
   M.tarimas.serie.forEach(r => { tar[r.f] = r.cons; });
-  const sinCons = st.filter(r => !r.consCargado && tar[r.f] > 0).map(r => fFecha(r.f));
-  if (sinCons.length) al.push(['warn', `Stretch: hay producción de pallets sin consumo de stretch cargado (${sinCons.join(', ')}).`]);
-  const invT = M.tarimas.inventario.slice(-1)[0];
-  if (invT && invT.sis && Math.abs(invT.sis - invT.fis) / invT.sis > 0.05) al.push(['warn', `Tarimas: el último inventario (${fFecha(invT.f)}) difiere ${pct(100 * (invT.sis - invT.fis) / invT.sis)} del sistema.`]);
-  const invS = M.stretch.inventario.slice(-1)[0];
-  if (invS && invS.sis && Math.abs(invS.sis - invS.fis) / invS.sis > 0.05) al.push(['warn', `Stretch: el último inventario (${fFecha(invS.f)}) difiere ${pct(100 * (invS.sis - invS.fis) / invS.sis)} del sistema.`]);
-  if (!al.length) al.push(['ok', 'Sin alertas.']);
-  $('listaAlertas').innerHTML = al.map(a => `<li class="${a[0]}">${esc(a[1])}</li>`).join('');
+  const sinCons = M.stretch.serie.filter(r => r.f >= isoDn(dn(M.fin) - 13) && r.f <= M.fin && !r.consCargado && tar[r.f] > 0).map(r => fFecha(r.f).slice(0, 5));
+  if (sinCons.length) al.push(['warn', '🧻', `Stretch: hay pallets producidos sin consumo de stretch cargado (${sinCons.join(', ')}).`]);
+  [['tarimas', 'Tarimas'], ['stretch', 'Stretch']].forEach(([id, n]) => {
+    const inv = M[id].inventario.slice(-1)[0];
+    if (inv && inv.sis && Math.abs(inv.sis - inv.fis) / inv.sis > 0.05) al.push(['warn', '📋', `${n}: el último inventario (${fFecha(inv.f)}) difiere ${pct(100 * (inv.sis - inv.fis) / inv.sis)} del sistema (físico ${fmt(inv.fis)} · sistema ${fmt(inv.sis)}).`]);
+  });
+  if (!al.length) al.push(['ok', '✅', 'Todo en orden: sin alertas.']);
+  const orden = { bad: 0, warn: 1, info: 2, ok: 3 };
+  return al.sort((a, b) => orden[a[0]] - orden[b[0]]);
 }
 
-function ultimoControl(x) {
-  const c = x.serie.filter(r => r.ctrl !== null && r.ctrl !== undefined).map(r => r.f).concat((x.inventario || []).map(r => r.f)).sort();
-  return c.length ? { f: c[c.length - 1] } : null;
+function kpiHtml(e, l, v, u, d, cls) {
+  return `<div class="kpi kacc ${cls || ''}"><div class="l"><span class="e">${e}</span>${l}</div><div class="v">${v}${u ? `<small>${u}</small>` : ''}</div><div class="d">${d || '&nbsp;'}</div></div>`;
 }
 
-function kpiHtml(l, v, s) { return `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s || '&nbsp;'}</div></div>`; }
+function cardHtml(titulo, sub, cuerpo, extra) {
+  return `<div class="card"${extra || ''}><div class="card-h"><div class="t"><h3>${titulo}</h3>${sub ? `<span class="sub">${sub}</span>` : ''}</div></div>${cuerpo}</div>`;
+}
 
-function renderInsumo() {
-  const id = ST.insumo, I = INSUMOS[id], M = ST.modelo, ins = M[id];
-  $('insTitulo').textContent = I.nombre;
-  document.querySelectorAll('#periodos button').forEach(b => b.classList.toggle('activo', b.dataset.per === ST.per));
-  const P = periodos(M.fin, ins.inicio);
+function vistaInsumo(id) {
+  ST.insumo = id;
+  const I = INSUMOS[id], M = ST.modelo, x = M[id];
+  const P = periodos(M.fin, x.inicio);
   const p = P[ST.per];
   const k = kpis(id, p);
   const kc = p.cmp ? kpis(id, P[p.cmp]) : null;
   const kc2 = p.cmp2 ? kpis(id, P[p.cmp2]) : null;
   const d1 = compara(k, kc), d2 = compara(k, kc2);
-  let rango = `${p.nombre}: ${fFecha(p.a)} al ${fFecha(p.b)} (${k.dias} días)`;
-  if (p.a < ins.inicio) rango += ` · los datos comienzan el ${fFecha(ins.inicio)}`;
-  if (kc) rango += ` · comparado con ${P[p.cmp].nombre} (${fFecha(P[p.cmp].a)} al ${fFecha(P[p.cmp].b)})`;
+  let rango = `${fFecha(p.a)} al ${fFecha(p.b)} · ${k.dias} días`;
+  if (p.a < x.inicio) rango += ` · datos desde ${fFecha(x.inicio)}`;
+  if (kc) rango += ` · vs. ${P[p.cmp].nombre}`;
   if (kc2) rango += ` y ${P[p.cmp2].nombre}`;
-  $('insRango').textContent = rango;
-  const cmpTxt = [d1 !== null ? `<span class="${dClase(d1)}">${delta(d1)}</span> vs. ${esc(P[p.cmp].nombre)}` : '', d2 !== null ? `<span class="${dClase(d2)}">${delta(d2)}</span> vs. ${esc(P[p.cmp2].nombre)}` : ''].filter(Boolean).join(' · ');
+  const cmp = [d1 !== null ? `<span class="${dClase(d1)}">${d1 > 0 ? '↗️' : '↘️'} ${delta(d1)}</span> vs. ${esc(P[p.cmp].nombre)}` : '', d2 !== null ? `<span class="${dClase(d2)}">${d2 > 0 ? '↗️' : '↘️'} ${delta(d2)}</span> vs. ${esc(P[p.cmp2].nombre)}` : ''].filter(Boolean).join('<br>');
   const u = I.u, dec = I.dec;
-  const h = [
-    kpiHtml(`Consumo diario promedio [${u}/día]`, fmt(k.lDia, dec), cmpTxt || 'Consumo ÷ días calendario'),
-    kpiHtml(`Consumo por día operativo [${u}/día]`, fmt(k.lDiaOp, dec), `${fmt(k.diasConsumo)} días con consumo`),
-    kpiHtml(`Consumo total [${u}]`, fmt(k.cons, 0), `P90 diario ${fmt(k.p90, dec)} · pico ${fmt(k.pico, dec)}`),
-    kpiHtml(`Ingresos [${u}]`, fmt(k.ingTotal, 0), `${fmt(k.entregas)} entregas · ${fmt(k.entregaProm, dec)} ${u}/entrega`),
-    kpiHtml(`Stock promedio [${u}]`, fmt(k.stockProm, 0), `Mínimo ${fmt(k.stockMin, 0)} ${u}`),
-    kpiHtml('Cobertura promedio [días]', fmt(k.coberturaProm, 1), `Rotación ${fmt(k.rotacion, 1)} veces en el período`),
-    kpiHtml('Días bajo stock de seguridad', fmt(k.diasBajoSS), `de ${fmt(k.diasConStock)} días con stock registrado`)
+  const ks = [
+    kpiHtml('📉', 'Consumo diario', fmt(k.lDia, dec), u + '/día', cmp || 'Consumo ÷ días calendario'),
+    kpiHtml('🏭', 'Por día operativo', fmt(k.lDiaOp, dec), u + '/día', `${fmt(k.diasConsumo)} días con consumo`),
+    kpiHtml('🔥', 'Consumo total', fmt(k.cons), u, `P90 ${fmt(k.p90, dec)} · pico ${fmt(k.pico, dec)}`),
+    kpiHtml('📥', 'Ingresos', fmt(k.ingTotal), u, `${fmt(k.entregas)} entregas · ${fmt(k.entregaProm, dec)} por entrega`),
+    kpiHtml('📦', 'Stock promedio', fmt(k.stockProm), u, `Mínimo ${fmt(k.stockMin)} ${u}`),
+    kpiHtml('⏳', 'Cobertura promedio', fmt(k.coberturaProm, 1), 'días', `Rotación ${fmt(k.rotacion, 1)} veces`),
+    kpiHtml('🚨', 'Días bajo SS', fmt(k.diasBajoSS), 'días', `de ${fmt(k.diasConStock)} con stock registrado`, k.diasBajoSS > 0 ? 'bad' : 'ok')
   ];
-  if (id === 'tarimas') {
-    h.push(kpiHtml('Descarte [u]', fmt(k.descarte), `${pct(k.descartePct)} de las tarimas usadas`));
-    h.push(kpiHtml('Envíos a otras plantas [u]', fmt(k.env), '&nbsp;'));
-    h.push(kpiHtml('Diferencia inventario vs. sistema', pct(k.difInv), `${fmt(k.inventarios)} inventarios en el período`));
-    h.push(kpiHtml('Controles físicos 6:00', fmt(k.controles), `Ajuste acumulado ${fmt(k.ajusteTotal, 0)} u`));
-  } else if (id === 'stretch') {
-    h.push(kpiHtml('Stretch por pallet [g/pallet]', fmt(k.grPallet, 0), 'Kg de stretch ÷ tarimas consumidas'));
-    h.push(kpiHtml('Bobinas por día', fmt(k.bobDia, 1), `${fmt(ST.datos.params.kgPorBobina)} kg por bobina`));
-    h.push(kpiHtml('Kg por bobina recibida', fmt(k.kgBobina, 1), 'Promedio de los ingresos'));
-    h.push(kpiHtml('Diferencia inventario vs. sistema', pct(k.difInv), `${fmt(k.inventarios)} inventarios en el período`));
-    h.push(kpiHtml('Días con pallets sin stretch cargado', fmt(k.diasSinConsumoCargado), 'Revisar carga de consumo'));
-  } else if (id === 'gasoil') {
-    h.push(kpiHtml('Despachos', fmt(k.despachos), `${fmt(k.lDespacho, 1)} L por despacho`));
-    h.push(kpiHtml('Unidades con consumo', fmt(k.unidades), '&nbsp;'));
-    h.push(kpiHtml('Litros cargados 22–6 h', pct(k.nocturno), 'Control de despachos nocturnos'));
-    h.push(kpiHtml('Despachos sin odómetro válido', pct(k.sinOdo), 'Vacío, 0, 9999 o 99999'));
-    h.push(kpiHtml('Diferencia sonda vs. teórico [L]', fmt(k.difSonda, 0), `Promedio de ${fmt(k.mediciones)} mediciones`));
-  } else if (id === 'cal') {
-    h.push(kpiHtml('Controles físicos 6:00', fmt(k.controles), `Ajuste acumulado ${fmt(k.ajusteTotal, 0)} bolsas`));
-  }
-  $('insKpis').innerHTML = h.join('');
+  if (id === 'tarimas') ks.push(
+    kpiHtml('🗑️', 'Descarte', fmt(k.descarte), u, `${pct(k.descartePct)} de las tarimas usadas`),
+    kpiHtml('🚚', 'Envíos a otras plantas', fmt(k.env), u, ''),
+    kpiHtml('📋', 'Inventario vs. sistema', pct(k.difInv), '', `${fmt(k.inventarios)} inventarios`, Math.abs(k.difInv || 0) > 5 ? 'warn' : ''),
+    kpiHtml('🔍', 'Controles 6:00', fmt(k.controles), '', `Ajuste acumulado ${fmt(k.ajusteTotal)} u`));
+  if (id === 'stretch') ks.push(
+    kpiHtml('🎁', 'Stretch por pallet', fmt(k.grPallet), 'g', 'Kg de stretch ÷ tarimas consumidas'),
+    kpiHtml('🧻', 'Bobinas por día', fmt(k.bobDia, 1), 'bob.', `${fmt(ST.datos.params.kgPorBobina)} kg por bobina`),
+    kpiHtml('⚖️', 'Kg por bobina recibida', fmt(k.kgBobina, 1), 'kg', 'Promedio de los ingresos'),
+    kpiHtml('📋', 'Inventario vs. sistema', pct(k.difInv), '', `${fmt(k.inventarios)} inventarios`, Math.abs(k.difInv || 0) > 5 ? 'warn' : ''),
+    kpiHtml('❓', 'Pallets sin stretch', fmt(k.diasSinConsumoCargado), 'días', 'Revisar la carga de consumo', k.diasSinConsumoCargado ? 'warn' : ''));
+  if (id === 'gasoil') ks.push(
+    kpiHtml('🚜', 'Despachos', fmt(k.despachos), '', `${fmt(k.lDespacho, 1)} L por despacho`),
+    kpiHtml('🚛', 'Unidades con consumo', fmt(k.unidades), '', ''),
+    kpiHtml('🌙', 'Cargado 22–6 h', pct(k.nocturno), '', 'Control de despachos nocturnos'),
+    kpiHtml('🧭', 'Sin odómetro válido', pct(k.sinOdo), '', 'Vacío, 0, 9999 o 99999', (k.sinOdo || 0) > 10 ? 'warn' : ''),
+    kpiHtml('📏', 'Sonda vs. teórico', fmt(k.difSonda), 'L', `Promedio de ${fmt(k.mediciones)} mediciones`));
+  if (id === 'cal') ks.push(kpiHtml('🔍', 'Controles 6:00', fmt(k.controles), '', `Ajuste acumulado ${fmt(k.ajusteTotal)} bolsas`));
 
-  const s = ins.serie.filter(r => r.f >= p.a && r.f <= p.b && r.stock !== null && r.stock !== undefined);
-  $('tStock').textContent = `Evolución del stock [${u}]` + (id === 'gasoil' ? ' (disponible, sin reserva de ' + fmt(ST.datos.params.reservaCisterna) + ' L)' : '');
+  const seg = ORDEN.map(i => `<button data-ins="${i}" class="${i === id ? 'on' : ''}"><span>${INSUMOS[i].emoji}</span>${INSUMOS[i].nombre}</button>`).join('');
+  const segP = PERIODOS_UI.map(q => `<button data-per="${q.id}" class="${q.id === ST.per ? 'on' : ''}"><span>${q.e}</span>${q.n}</button>`).join('');
+  const ctrl = ultimoControl(x);
+  app().innerHTML = `<section class="vista">
+    <div class="seg" id="segIns" style="margin-bottom:14px">${seg}</div>
+    <div class="card det-hero ${x.estado}" style="--c:var(--c-${id})">
+      <span class="ins-ico">${I.emoji}</span>
+      <div><div class="eyebrow">${I.desc}</div><h1>${I.nombre}</h1>
+        <div class="datos"><span class="grande">${fmt(x.stock)} <small>${u}</small></span>
+          <span class="tag est-tag">${ESTADO[x.estado]}</span>
+          <span class="cob">⏳ <b>${fmt(x.cobertura, 1)}</b> días</span>
+          <span class="sub">Consumo medio ${fmt(x.medio, dec)} ${u}/día · PP ${fmt(x.pp)} · SS ${fmt(x.ss)} · último control ${ctrl ? fFecha(ctrl.f) : '—'}</span></div></div>
+      ${ilus(id, x.stock, x)}
+    </div>
+    <div class="barra-per"><div class="seg" id="segPer">${segP}</div><span class="rango">🗓️ ${rango}</span></div>
+    <div class="kpis stagger">${ks.map((h, i) => h.replace('class="kpi', `style="--i:${i}" class="kpi`)).join('')}</div>
+    <div class="grid g2">
+      ${cardHtml('📦 Evolución del stock', id === 'gasoil' ? `Disponible, sin la reserva de ${fmt(ST.datos.params.reservaCisterna)} L` : 'Con punto de pedido y stock de seguridad actuales', '<div class="chart lg"><canvas id="chStock"></canvas></div>')}
+      ${cardHtml('📊 Consumo diario por mes', `${u}/día · resaltado el período elegido`, '<div class="chart lg"><canvas id="chMensual"></canvas></div>')}
+    </div>
+    <div id="esp"></div>
+  </section>`;
+
+  $('segIns').querySelectorAll('button').forEach(b => { b.onclick = () => { location.hash = '#/' + b.dataset.ins; }; });
+  $('segPer').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.per = b.dataset.per; LS.set('ic_per', ST.per); vistaInsumo(id); }; });
+  requestAnimationFrame(() => { moverPill($('segIns')); moverPill($('segPer')); });
+
+  const ci = colorIns(id);
+  const s = x.serie.filter(r => r.f >= p.a && r.f <= p.b && r.stock !== null && r.stock !== undefined);
   grafico('chStock', {
     type: 'line',
-    data: {
-      labels: s.map(r => fFecha(r.f)),
-      datasets: [
-        { label: 'Stock', data: s.map(r => r.stock), borderColor: I.color, backgroundColor: I.color + '22', fill: true, pointRadius: 0, borderWidth: 1.8, tension: 0 },
-        { label: 'Punto de pedido (actual)', data: s.map(() => ins.pp), borderColor: '#d98e1f', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 },
-        { label: 'Stock de seguridad (actual)', data: s.map(() => ins.ss), borderColor: '#c0392b', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 }
-      ]
-    },
-    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y, dec) } } }, scales: { x: { ticks: { maxTicksLimit: 8, autoSkip: true }, grid: { display: false } }, y: ejeNum(0) } }
+    data: { labels: s.map(r => fFecha(r.f)), datasets: [
+      { label: 'Stock', data: s.map(r => r.stock), borderColor: ci, borderWidth: 2, pointRadius: 0, fill: true, tension: 0,
+        backgroundColor: ctx => { const { ctx: g, chartArea: a } = ctx.chart; if (!a) return alfa(ci, .15); const gr = g.createLinearGradient(0, a.top, 0, a.bottom); gr.addColorStop(0, alfa(ci, .35)); gr.addColorStop(1, alfa(ci, .02)); return gr; } },
+      { label: 'Punto de pedido', data: s.map(() => x.pp), borderColor: cv('--warn'), borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
+      { label: 'Stock de seguridad', data: s.map(() => x.ss), borderColor: cv('--bad'), borderDash: [3, 3], borderWidth: 1.5, pointRadius: 0 }
+    ] },
+    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y, dec) + ' ' + u } } }, scales: { x: ejeX(), y: ejeY(0) } }
   });
-
   const men = mensual(id);
-  $('tMensual').textContent = `Consumo diario promedio por mes [${u}/día]`;
   grafico('chMensual', {
     type: 'bar',
-    data: { labels: men.map(r => fMes(r.mes)), datasets: [{ label: `${u}/día`, data: men.map(r => r.v), backgroundColor: men.map(r => (r.mes >= p.a.slice(0, 7) && r.mes <= p.b.slice(0, 7)) ? I.color : I.color + '55') }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.y, dec) + ' ' + u + '/día' } } }, scales: { x: { grid: { display: false } }, y: ejeNum(0) } }
+    data: { labels: men.map(r => fMes(r.mes)), datasets: [{ label: u + '/día', data: men.map(r => r.v), borderRadius: 6, backgroundColor: men.map(r => (r.mes >= p.a.slice(0, 7) && r.mes <= p.b.slice(0, 7)) ? ci : alfa(ci, .28)) }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.y, dec) + ' ' + u + '/día' } } }, scales: { x: ejeX(), y: ejeY(0) } }
   });
-
-  $('insEspecifico').innerHTML = '';
-  if (id === 'tarimas') especificoTarimas(p);
-  if (id === 'stretch') especificoStretch(p);
-  if (id === 'gasoil') especificoGasoil(p, P);
-  if (id === 'cal') especificoCal(p);
-}
-
-function mensual(id) {
-  const ins = ST.modelo[id], fin = ST.modelo.fin;
-  const acc = {}, dias = {};
-  ins.serie.forEach(r => { if (r.f > fin) return; const m = r.f.slice(0, 7); acc[m] = (acc[m] || 0) + r.cons; dias[m] = (dias[m] || 0) + 1; });
-  return Object.keys(acc).sort().map(m => ({ mes: m, v: acc[m] / dias[m] }));
+  if (id === 'tarimas') espTarimas(p);
+  if (id === 'stretch') espStretch(p);
+  if (id === 'gasoil') espGasoil(p, P);
+  if (id === 'cal') espCal(p);
 }
 
 function tablaProveedores(movs, u, dec, conBob) {
@@ -433,407 +405,403 @@ function tablaProveedores(movs, u, dec, conBob) {
   movs.forEach(m => { const k = m.prov || '(sin proveedor)'; g[k] = g[k] || { n: 0, q: 0, bob: 0 }; g[k].n += m.cant > 0 ? 1 : 0; g[k].q += m.cant; g[k].bob += m.bob || 0; });
   const tot = sumar(Object.values(g), 'q');
   const filas = Object.entries(g).sort((a, b) => b[1].q - a[1].q);
-  if (!filas.length) return '<p class="vacio">Sin ingresos en el período.</p>';
-  return `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Proveedor</th><th>Entregas</th><th>Cantidad [${u}]</th><th>Participación</th><th>Promedio por entrega</th>${conBob ? '<th>Bobinas</th><th>Kg/bobina</th>' : ''}</tr></thead><tbody>` +
-    filas.map(([p, x]) => `<tr><td>${esc(p)}</td><td>${fmt(x.n)}</td><td>${fmt(x.q, dec)}</td><td>${pct(tot ? 100 * x.q / tot : null)}</td><td>${fmt(x.n ? x.q / x.n : null, dec)}</td>${conBob ? `<td>${fmt(x.bob, 0)}</td><td>${fmt(x.bob ? x.q / x.bob : null, 1)}</td>` : ''}</tr>`).join('') +
-    `<tr class="total"><td>Total</td><td>${fmt(sumar(filas.map(f => f[1].n)))}</td><td>${fmt(tot, dec)}</td><td>100,0 %</td><td></td>${conBob ? '<td></td><td></td>' : ''}</tr></tbody></table></div>`;
+  if (!filas.length) return '<div class="empty">📭 Sin ingresos en el período</div>';
+  const max = Math.max.apply(null, filas.map(f => f[1].q).concat([1]));
+  return `<div class="tw"><table><thead><tr><th>Proveedor</th><th class="n">Entregas</th><th class="n">Cantidad [${u}]</th><th class="n">Participación</th><th class="n">Por entrega</th>${conBob ? '<th class="n">Bobinas</th><th class="n">Kg/bobina</th>' : ''}</tr></thead><tbody>` +
+    filas.map(([p, x]) => `<tr><td>🏷️ ${esc(p)}</td><td class="n">${fmt(x.n)}</td><td class="n">${fmt(x.q, dec)}</td><td class="n">${pct(tot ? 100 * x.q / tot : null)}<span class="minibar"><span style="width:${100 * Math.max(x.q, 0) / max}%;background:var(--accent)"></span></span></td><td class="n">${fmt(x.n ? x.q / x.n : null, dec)}</td>${conBob ? `<td class="n">${fmt(x.bob)}</td><td class="n">${fmt(x.bob ? x.q / x.bob : null, 1)}</td>` : ''}</tr>`).join('') +
+    `<tr class="total"><td>Total</td><td class="n">${fmt(sumar(filas.map(f => f[1].n)))}</td><td class="n">${fmt(tot, dec)}</td><td class="n">100,0 %</td><td></td>${conBob ? '<td></td><td></td>' : ''}</tr></tbody></table></div>`;
 }
 
-function panelHtml(titulo, cuerpo) { return `<div class="panel"><h3>${titulo}</h3>${cuerpo}</div>`; }
-
-function especificoTarimas(p) {
-  const ins = ST.modelo.tarimas;
-  const mv = movsPeriodo(ins, p).filter(m => m.tipo === 'Ingreso');
-  $('insEspecifico').innerHTML = `<div class="grid-2">${panelHtml('Ingresos por proveedor', tablaProveedores(mv, 'u', 0))}${panelHtml('Inventario físico vs. sistema [%]', '<div class="chart-box h300"><canvas id="chEsp1"></canvas></div>')}</div>` +
-    panelHtml('Consumo, ingresos y descarte por mes [u]', '<div class="chart-box h300"><canvas id="chEsp2"></canvas></div>');
-  const inv = ins.inventario.filter(r => r.sis);
-  grafico('chEsp1', {
+function espTarimas(p) {
+  const x = ST.modelo.tarimas;
+  const mv = movsPeriodo(x, p).filter(m => m.tipo === 'Ingreso');
+  $('esp').innerHTML = `<div class="grid g2">${cardHtml('🏷️ Ingresos por proveedor', 'Período elegido', tablaProveedores(mv, 'u', 0))}${cardHtml('📋 Inventario físico vs. sistema', 'Diferencia (sistema − físico) ÷ sistema · rojo si supera 5 %', '<div class="chart"><canvas id="chE1"></canvas></div>')}</div>` +
+    cardHtml('🔁 Consumo, ingresos y descarte por mes', 'Unidades', '<div class="chart lg"><canvas id="chE2"></canvas></div>');
+  const inv = x.inventario.filter(r => r.sis);
+  grafico('chE1', {
     type: 'bar',
-    data: { labels: inv.map(r => fFecha(r.f)), datasets: [{ label: 'Diferencia (sistema − físico) / sistema', data: inv.map(r => 100 * (r.sis - r.fis) / r.sis), backgroundColor: inv.map(r => Math.abs((r.sis - r.fis) / r.sis) > 0.05 ? '#c0392b' : '#3d8b37') }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => pct(c.parsed.y) + ` (físico ${fmt(inv[c.dataIndex].fis)} · sistema ${fmt(inv[c.dataIndex].sis)})` } } }, scales: { x: { grid: { display: false } }, y: ejeNum(0) } }
+    data: { labels: inv.map(r => fFecha(r.f).slice(0, 5)), datasets: [{ data: inv.map(r => 100 * (r.sis - r.fis) / r.sis), borderRadius: 5, backgroundColor: inv.map(r => Math.abs((r.sis - r.fis) / r.sis) > 0.05 ? cv('--bad') : cv('--ok')) }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => pct(c.parsed.y) + ` · físico ${fmt(inv[c.dataIndex].fis)} · sistema ${fmt(inv[c.dataIndex].sis)}` } } }, scales: { x: ejeX(), y: Object.assign(ejeY(0), { beginAtZero: true }) } }
   });
   const g = {};
-  ins.serie.filter(r => r.f <= ST.modelo.fin).forEach(r => { const m = r.f.slice(0, 7); g[m] = g[m] || { c: 0, i: 0, d: 0 }; g[m].c += r.cons; g[m].i += r.ing; g[m].d += r.desc; });
+  x.serie.filter(r => r.f <= ST.modelo.fin).forEach(r => { const m = r.f.slice(0, 7); g[m] = g[m] || { c: 0, i: 0, d: 0 }; g[m].c += r.cons; g[m].i += r.ing; g[m].d += r.desc; });
   const ms = Object.keys(g).sort();
-  grafico('chEsp2', {
+  grafico('chE2', {
     type: 'bar',
     data: { labels: ms.map(fMes), datasets: [
-      { label: 'Consumo', data: ms.map(m => g[m].c), backgroundColor: '#a0522d' },
-      { label: 'Ingresos', data: ms.map(m => g[m].i), backgroundColor: '#0270ba' },
-      { label: 'Descarte (eje der.)', data: ms.map(m => g[m].d), type: 'line', borderColor: '#c0392b', yAxisID: 'y2', pointRadius: 2 }
+      { label: 'Consumo', data: ms.map(m => g[m].c), backgroundColor: colorIns('tarimas'), borderRadius: 5 },
+      { label: 'Ingresos', data: ms.map(m => g[m].i), backgroundColor: cv('--s1'), borderRadius: 5 },
+      { label: 'Descarte (eje derecho)', data: ms.map(m => g[m].d), type: 'line', borderColor: cv('--bad'), backgroundColor: cv('--bad'), yAxisID: 'y2', pointRadius: 2.5, tension: .25 }
     ] },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { grid: { display: false } }, y: ejeNum(0), y2: { position: 'right', grid: { display: false }, ticks: { callback: v => fmt(v) } } } }
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: ejeX(), y: ejeY(0), y2: { position: 'right', beginAtZero: true, grid: { display: false }, border: { display: false }, ticks: { callback: v => fmt(v) } } } }
   });
 }
 
-function especificoStretch(p) {
-  const ins = ST.modelo.stretch;
-  const mv = movsPeriodo(ins, p).filter(m => m.tipo !== 'Envío');
-  $('insEspecifico').innerHTML = panelHtml('Ingresos por proveedor', tablaProveedores(mv, 'kg', 1, true)) + `<div class="grid-2">${panelHtml('Stretch por pallet por mes [g/pallet]', '<div class="chart-box h300"><canvas id="chEsp1"></canvas></div>')}${panelHtml('Inventario físico vs. sistema [bobinas]', '<div class="chart-box h300"><canvas id="chEsp2"></canvas></div>')}</div>`;
+function espStretch(p) {
+  const x = ST.modelo.stretch;
+  const mv = movsPeriodo(x, p).filter(m => m.tipo !== 'Envío');
+  $('esp').innerHTML = cardHtml('🏷️ Ingresos por proveedor', 'Período elegido · kg por bobina de cada proveedor', tablaProveedores(mv, 'kg', 1, true)) +
+    `<div class="grid g2">${cardHtml('🎁 Stretch por pallet', 'Gramos por tarima consumida, por mes', '<div class="chart"><canvas id="chE1"></canvas></div>')}${cardHtml('📋 Inventario físico vs. sistema', 'Bobinas', '<div class="chart"><canvas id="chE2"></canvas></div>')}</div>`;
   const tar = {};
   ST.modelo.tarimas.serie.forEach(r => { tar[r.f] = r.cons; });
   const g = {};
-  ins.serie.filter(r => r.f <= ST.modelo.fin && r.cons > 0 && tar[r.f] > 0).forEach(r => { const m = r.f.slice(0, 7); g[m] = g[m] || { kg: 0, p: 0 }; g[m].kg += r.cons; g[m].p += tar[r.f]; });
+  x.serie.filter(r => r.f <= ST.modelo.fin && r.cons > 0 && tar[r.f] > 0).forEach(r => { const m = r.f.slice(0, 7); g[m] = g[m] || { kg: 0, p: 0 }; g[m].kg += r.cons; g[m].p += tar[r.f]; });
   const ms = Object.keys(g).sort();
-  grafico('chEsp1', {
+  const ci = colorIns('stretch');
+  grafico('chE1', {
     type: 'line',
-    data: { labels: ms.map(fMes), datasets: [{ label: 'g/pallet', data: ms.map(m => 1000 * g[m].kg / g[m].p), borderColor: '#0270ba', pointRadius: 3, tension: 0 }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.y, 0) + ' g/pallet' } } }, scales: { x: { grid: { display: false } }, y: ejeNum(0) } }
+    data: { labels: ms.map(fMes), datasets: [{ label: 'g/pallet', data: ms.map(m => 1000 * g[m].kg / g[m].p), borderColor: ci, backgroundColor: ci, pointRadius: 3.5, tension: .25 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.y) + ' g/pallet' } } }, scales: { x: ejeX(), y: Object.assign(ejeY(0), { beginAtZero: false }) } }
   });
-  const inv = ins.inventario;
-  grafico('chEsp2', {
+  const inv = x.inventario;
+  grafico('chE2', {
     type: 'bar',
-    data: { labels: inv.map(r => fFecha(r.f)), datasets: [{ label: 'Físico', data: inv.map(r => r.fis), backgroundColor: '#0270ba' }, { label: 'Sistema', data: inv.map(r => r.sis), backgroundColor: '#8c949c' }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { grid: { display: false } }, y: ejeNum(0) } }
+    data: { labels: inv.map(r => fFecha(r.f).slice(0, 5)), datasets: [{ label: 'Físico', data: inv.map(r => r.fis), backgroundColor: ci, borderRadius: 5 }, { label: 'Sistema', data: inv.map(r => r.sis), backgroundColor: cv('--line-2'), borderRadius: 5 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: ejeX(), y: ejeY(0) } }
   });
 }
 
-function especificoCal(p) {
-  const ins = ST.modelo.cal;
-  const s = ins.serie.filter(r => r.f >= p.a && r.f <= p.b);
-  $('insEspecifico').innerHTML = panelHtml('Consumo diario [bolsas]', '<div class="chart-box h300"><canvas id="chEsp1"></canvas></div>') +
-    panelHtml('Ingresos del período', tablaProveedores(movsPeriodo(ins, p).map(m => Object.assign({}, m, { prov: m.obs || '(sin detalle)' })), 'bolsas', 0));
-  grafico('chEsp1', {
+function espCal(p) {
+  const x = ST.modelo.cal;
+  const s = x.serie.filter(r => r.f >= p.a && r.f <= p.b);
+  $('esp').innerHTML = `<div class="grid g2">${cardHtml('🪣 Consumo diario', 'Bolsas por día y del turno 1', '<div class="chart"><canvas id="chE1"></canvas></div>')}${cardHtml('📥 Ingresos', 'Período elegido', tablaProveedores(movsPeriodo(x, p).map(m => Object.assign({}, m, { prov: m.obs || '(sin detalle)' })), 'bolsas', 0))}</div>`;
+  grafico('chE1', {
     type: 'bar',
-    data: { labels: s.map(r => fFecha(r.f)), datasets: [{ label: 'Consumo', data: s.map(r => r.cons), backgroundColor: '#7a8592' }, { label: 'Consumo turno 1', data: s.map(r => r.consT1), type: 'line', borderColor: '#0270ba', pointRadius: 2 }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { grid: { display: false } }, y: ejeNum(0) } }
+    data: { labels: s.map(r => fFecha(r.f).slice(0, 5)), datasets: [{ label: 'Consumo', data: s.map(r => r.cons), backgroundColor: colorIns('cal'), borderRadius: 5 }, { label: 'Turno 1', data: s.map(r => r.consT1), type: 'line', borderColor: cv('--s1'), backgroundColor: cv('--s1'), pointRadius: 2.5 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: ejeX(), y: ejeY(0) } }
   });
 }
 
-function agruparGasoil(p, P) {
-  const ins = ST.modelo.gasoil;
-  const dias = Math.max(dn(p.b) - dn(p.a < ins.inicio ? ins.inicio : p.a) + 1, 1);
-  const tx = ins.tx.filter(t => t.f >= p.a && t.f <= p.b);
-  const c = p.cmp ? P[p.cmp] : null;
-  const diasC = c ? Math.max(dn(c.b) - dn(c.a < ins.inicio ? ins.inicio : c.a) + 1, 1) : 1;
-  const txc = c ? ins.tx.filter(t => t.f >= c.a && t.f <= c.b) : [];
-  const tot = sumar(tx, 'l');
-  const dep = {}, uni = {}, depC = {}, uniC = {};
-  tx.forEach(t => {
-    dep[t.d] = dep[t.d] || { l: 0, u: new Set(), n: 0 }; dep[t.d].l += t.l; dep[t.d].u.add(t.u); dep[t.d].n++;
-    uni[t.u] = uni[t.u] || { l: 0, n: 0, d: t.d }; uni[t.u].l += t.l; uni[t.u].n++;
-  });
-  txc.forEach(t => { depC[t.d] = (depC[t.d] || 0) + t.l; uniC[t.u] = (uniC[t.u] || 0) + t.l; });
-  return { dias, diasC, tot, dep, uni, depC, uniC, c };
-}
-
-function especificoGasoil(p, P) {
+function espGasoil(p, P) {
   const G = agruparGasoil(p, P);
   const conC = !!G.c;
   const dv = (l, lc) => conC ? (lc ? 100 * (l / G.dias - lc / G.diasC) / (lc / G.diasC) : null) : null;
+  const vtxt = v => v === null ? '—' : v > 999 ? '> +999 %' : delta(v);
+  const EM = { 'Máquinas cargadoras': '🚜', 'Camiones': '🚛', 'Autoelevadores': '🏗️', 'Camionetas': '🛻', 'Generador': '⚡', 'Mantenimiento': '🔧', 'Otros': '❔' };
   const deps = Object.entries(G.dep).sort((a, b) => b[1].l - a[1].l);
-  const tDep = `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Departamento</th><th>Unidades</th><th>Litros</th><th>L/día</th><th>Participación</th>${conC ? '<th>L/día comparado</th><th>Variación</th>' : ''}</tr></thead><tbody>` +
-    deps.map(([d, x]) => { const v = dv(x.l, G.depC[d]); return `<tr><td>${esc(d)}</td><td>${x.u.size}</td><td>${fmt(x.l, 0)}</td><td>${fmt(x.l / G.dias, 1)}</td><td>${pct(100 * x.l / G.tot)}</td>${conC ? `<td>${G.depC[d] ? fmt(G.depC[d] / G.diasC, 1) : '—'}</td><td class="${dClase(v)}">${G.depC[d] ? (v > 999 ? '> +999 %' : delta(v)) : 'Nuevo'}</td>` : ''}</tr>`; }).join('') + '</tbody></table></div>';
+  const tDep = `<div class="tw"><table><thead><tr><th>Departamento</th><th class="n">Unid.</th><th class="n">Litros</th><th class="n">L/día</th><th class="n">Part.</th>${conC ? '<th class="n">L/día comp.</th><th class="n">Var.</th>' : ''}</tr></thead><tbody>` +
+    deps.map(([d, x]) => { const v = dv(x.l, G.depC[d]); return `<tr><td>${EM[d] || '🚗'} ${esc(d)}</td><td class="n">${x.u.size}</td><td class="n">${fmt(x.l)}</td><td class="n">${fmt(x.l / G.dias, 1)}</td><td class="n">${pct(100 * x.l / G.tot)}</td>${conC ? `<td class="n">${G.depC[d] ? fmt(G.depC[d] / G.diasC, 1) : '—'}</td><td class="n"><span class="${dClase(v)}">${G.depC[d] ? vtxt(v) : '🆕 Nuevo'}</span></td>` : ''}</tr>`; }).join('') + '</tbody></table></div>';
   const max = Math.max.apply(null, Object.values(G.uni).map(x => x.l).concat([1]));
-  const tUni = `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Unidad</th><th>L/día</th><th>Litros</th><th>Participación</th><th>Despachos</th><th>L/despacho</th>${conC ? '<th>L/día comparado</th><th>Variación</th>' : ''}</tr></thead><tbody>` +
-    deps.map(([d]) => `<tr class="grupo"><td colspan="${conC ? 8 : 6}">${esc(d)}</td></tr>` + Object.entries(G.uni).filter(e => e[1].d === d).sort((a, b) => b[1].l - a[1].l).map(([u, x]) => {
-      const v = dv(x.l, G.uniC[u]);
-      return `<tr><td>${esc(u)}</td><td>${fmt(x.l / G.dias, 1)} <span style="display:inline-block;width:60px;height:7px;background:#edf0f3;border-radius:3px;vertical-align:middle;margin-left:6px"><span style="display:block;height:100%;width:${100 * x.l / max}%;background:#3d8b37;border-radius:3px"></span></span></td><td>${fmt(x.l, 0)}</td><td>${pct(100 * x.l / G.tot)}</td><td>${fmt(x.n)}</td><td>${fmt(x.l / x.n, 1)}</td>${conC ? `<td>${G.uniC[u] ? fmt(G.uniC[u] / G.diasC, 1) : '—'}</td><td class="${dClase(v)}">${G.uniC[u] ? (v > 999 ? '> +999 %' : delta(v)) : 'Nueva'}</td>` : ''}</tr>`;
+  const tUni = `<div class="tw max"><table><thead><tr><th>Unidad</th><th class="n">L/día</th><th class="n">Litros</th><th class="n">Part.</th><th class="n">Despachos</th><th class="n">L/despacho</th>${conC ? '<th class="n">L/día comp.</th><th class="n">Var.</th>' : ''}</tr></thead><tbody>` +
+    deps.map(([d]) => `<tr class="grupo"><td colspan="${conC ? 8 : 6}">${EM[d] || '🚗'} ${esc(d)}</td></tr>` + Object.entries(G.uni).filter(e => e[1].d === d).sort((a, b) => b[1].l - a[1].l).map(([un, x]) => {
+      const v = dv(x.l, G.uniC[un]);
+      return `<tr><td>${esc(un)}</td><td class="n">${fmt(x.l / G.dias, 1)}<span class="minibar"><span style="width:${100 * x.l / max}%"></span></span></td><td class="n">${fmt(x.l)}</td><td class="n">${pct(100 * x.l / G.tot)}</td><td class="n">${fmt(x.n)}</td><td class="n">${fmt(x.l / x.n, 1)}</td>${conC ? `<td class="n">${G.uniC[un] ? fmt(G.uniC[un] / G.diasC, 1) : '—'}</td><td class="n"><span class="${dClase(v)}">${G.uniC[un] ? vtxt(v) : '🆕 Nueva'}</span></td>` : ''}</tr>`;
     }).join('')).join('') + '</tbody></table></div>';
   const cargas = movsPeriodo(ST.modelo.gasoil, p).filter(m => m.tipo === 'Carga cisterna');
-  const tCargas = cargas.length ? `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Fecha</th><th>Litros</th><th class="txt">Observaciones</th></tr></thead><tbody>${cargas.slice().reverse().map(m => `<tr><td>${fFecha(m.f)}</td><td>${fmt(m.cant, 0)}</td><td class="txt">${esc(m.obs)}</td></tr>`).join('')}</tbody></table></div><p class="nota">${cargas.length} cargas · ${fmt(sumar(cargas, 'cant'), 0)} L · ${fmt(sumar(cargas, 'cant') / cargas.length, 0)} L por carga</p>` : '<p class="vacio">Sin cargas registradas en el período (el registro de cargas comienza en 2026).</p>';
-  $('insEspecifico').innerHTML = panelHtml('Consumo por departamento', tDep) + panelHtml('Consumo diario por departamento y mes [L/día]', '<div class="chart-box h300"><canvas id="chEsp1"></canvas></div>') +
-    panelHtml('Consumo diario promedio por unidad', tUni) + panelHtml('Cargas de cisterna', tCargas);
-  const ins = ST.modelo.gasoil, fin = ST.modelo.fin;
+  const tCargas = cargas.length ? `<div class="mov-lista">${cargas.slice().reverse().slice(0, 8).map(m => `<div class="mov"><span class="e">🛢️</span><div class="t"><b>${fFecha(m.f)}</b><div class="sub">${esc(m.obs || 'Carga de cisterna')}</div></div><div class="q">${fmt(m.cant)} L</div></div>`).join('')}</div><p class="nota">${cargas.length} cargas · ${fmt(sumar(cargas, 'cant'))} L · ${fmt(sumar(cargas, 'cant') / cargas.length)} L por carga</p>` : '<div class="empty">📭 Sin cargas en el período (el registro empieza en 2026)</div>';
+  $('esp').innerHTML = `<div class="grid g-21">${cardHtml('🏢 Consumo por departamento', 'Período elegido', tDep)}${cardHtml('🛢️ Cargas de cisterna', 'Período elegido', tCargas)}</div>` +
+    cardHtml('📊 Consumo diario por departamento y mes', 'L/día', '<div class="chart lg"><canvas id="chE1"></canvas></div>') +
+    cardHtml('🚛 Consumo diario promedio por unidad', 'Agrupado por departamento', tUni);
+  const x = ST.modelo.gasoil, fin = ST.modelo.fin;
   const totD = {};
-  ins.tx.forEach(t => { totD[t.d] = (totD[t.d] || 0) + t.l; });
+  x.tx.forEach(t => { totD[t.d] = (totD[t.d] || 0) + t.l; });
   const top = Object.entries(totD).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
   const series = top.concat(['Resto']);
   const g = {}, dias = {};
-  ins.serie.filter(r => r.f <= fin).forEach(r => { const m = r.f.slice(0, 7); dias[m] = (dias[m] || 0) + 1; });
-  ins.tx.filter(t => t.f <= fin).forEach(t => { const m = t.f.slice(0, 7), s = top.includes(t.d) ? t.d : 'Resto'; g[m + '|' + s] = (g[m + '|' + s] || 0) + t.l; });
+  x.serie.filter(r => r.f <= fin).forEach(r => { const m = r.f.slice(0, 7); dias[m] = (dias[m] || 0) + 1; });
+  x.tx.filter(t => t.f <= fin).forEach(t => { const m = t.f.slice(0, 7), s = top.includes(t.d) ? t.d : 'Resto'; g[m + '|' + s] = (g[m + '|' + s] || 0) + t.l; });
   const ms = Object.keys(dias).sort();
-  grafico('chEsp1', {
+  grafico('chE1', {
     type: 'bar',
-    data: { labels: ms.map(fMes), datasets: series.map((s, i) => ({ label: s, data: ms.map(m => (g[m + '|' + s] || 0) / dias[m]), backgroundColor: PALETA[i] })) },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y, 1) + ' L/día' } } }, scales: { x: { stacked: true, grid: { display: false } }, y: Object.assign({ stacked: true }, ejeNum(0)) } }
+    data: { labels: ms.map(fMes), datasets: series.map((s, i) => ({ label: s, data: ms.map(m => (g[m + '|' + s] || 0) / dias[m]), backgroundColor: cv(PALETA[i]), borderRadius: 3 })) },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y, 1) + ' L/día' } } }, scales: { x: Object.assign(ejeX(), { stacked: true }), y: Object.assign(ejeY(0), { stacked: true }) } }
   });
 }
 
-const OPS = {
-  tarimas: [
-    { id: 'ingresoTarimas', nombre: 'Ingreso de proveedor', campos: ['fecha', 'cantidad', 'proveedor', 'remito', 'obs'], ayuda: 'Se agrega a MovimientosTarimas; suma al stock del día.' },
-    { id: 'envioTarimas', nombre: 'Envío a otra planta', campos: ['fecha', 'cantidad', 'remito', 'obs'], ayuda: 'Se registra con proveedor «Envío» y descuenta del stock.' },
-    { id: 'descarteTarimas', nombre: 'Descarte', campos: ['fecha', 'cantidad', 'proveedor', 'obs'], ayuda: 'Tarimas rotas o no aptas; descuenta del stock.', provOpcional: true },
-    { id: 'controlFisico', nombre: 'Control físico 6:00', campos: ['fecha', 'cantidad'], ayuda: 'Conteo a las 6:00. El ajuste se calcula contra el stock del sistema a esa hora.', etiqueta: 'Tarimas contadas' },
-    { id: 'inventario', nombre: 'Inventario físico (comparación)', campos: ['fecha', 'cantidad'], ayuda: 'Se agrega a «InventarioVsSistema»; no ajusta el stock.', etiqueta: 'Tarimas contadas' }
-  ],
-  stretch: [
-    { id: 'ingresoStretch', nombre: 'Ingreso de proveedor', campos: ['fecha', 'kg', 'bobinas', 'proveedor', 'remito', 'obs'], ayuda: 'Si dejás vacías las bobinas se calculan como kg ÷ 15. Para devoluciones al proveedor cargá kg negativos.' },
-    { id: 'envioStretch', nombre: 'Envío a otra planta', campos: ['fecha', 'kg', 'bobinas', 'remito', 'obs'], ayuda: 'Se registra con proveedor «Envío» y descuenta del stock.' },
-    { id: 'consumoStretch', nombre: 'Consumo del día [kg]', campos: ['fecha', 'kg', 'sobrescribir'], ayuda: 'Se escribe en StockDiarioStretch (columna Consumo Stretch [Kg]).' },
-    { id: 'controlFisico', nombre: 'Control físico 6:00 [bobinas]', campos: ['fecha', 'cantidad'], ayuda: 'Conteo de bobinas a las 6:00.', etiqueta: 'Bobinas contadas' },
-    { id: 'inventario', nombre: 'Inventario físico (comparación) [bobinas]', campos: ['fecha', 'cantidad'], ayuda: 'Se agrega a «StretchInventarioVsSistema»; no ajusta el stock.', etiqueta: 'Bobinas contadas' }
-  ],
-  gasoil: [
-    { id: 'cargaGasoil', nombre: 'Carga de cisterna', campos: ['fecha', 'hora', 'valor', 'obs'], ayuda: 'Litros descargados por el proveedor en la cisterna (Cargas_y_Ajustes).', etiqueta: 'Litros cargados' },
-    { id: 'sondaGasoil', nombre: 'Medición de sonda', campos: ['fecha', 'hora', 'valor', 'obs'], ayuda: 'Altura en cm (0 a 219). Reemplaza el stock teórico de ese día.', etiqueta: 'Altura de sonda [cm]' }
-  ],
-  cal: [
-    { id: 'ingresoCal', nombre: 'Ingreso de proveedor', campos: ['fecha', 'cantidad', 'provTexto', 'remito', 'obs'], ayuda: 'Se agrega a MovimientosCal.', etiqueta: 'Bolsas' },
-    { id: 'controlFisico', nombre: 'Control físico 6:00', campos: ['fecha', 'cantidad'], ayuda: 'Conteo de bolsas a las 6:00.', etiqueta: 'Bolsas contadas' }
-  ]
-};
-
-function campoHtml(c, op, insumo) {
+function campoHtml(c, op, ins) {
   const hoy = hoyLocal();
   const ahora = new Date().toTimeString().slice(0, 5);
   switch (c) {
-    case 'fecha': return `<label>Fecha<input type="date" name="fecha" value="${hoy}" max="${hoy}" required></label>`;
-    case 'hora': return `<label>Hora<input type="time" name="hora" value="${ahora}"></label>`;
-    case 'cantidad': return `<label>${op.etiqueta || 'Cantidad [' + INSUMOS[insumo].u + ']'}<input type="number" name="cantidad" min="0" step="1" required inputmode="numeric"></label>`;
-    case 'kg': return `<label>Kilos<input type="number" name="kg" step="0.1" required inputmode="decimal"></label>`;
-    case 'bobinas': return `<label>Bobinas<input type="number" name="bobinas" step="1" inputmode="numeric" placeholder="kg ÷ 15"></label>`;
-    case 'valor': return `<label>${op.etiqueta}<input type="number" name="valor" min="0" step="${op.id === 'sondaGasoil' ? '0.1' : '1'}" required inputmode="decimal"></label>`;
+    case 'fecha': return `<label class="f">📅 Fecha<input type="date" name="fecha" value="${hoy}" max="${hoy}" required></label>`;
+    case 'hora': return `<label class="f">🕐 Hora<input type="time" name="hora" value="${ahora}"></label>`;
+    case 'cantidad': return `<label class="f">🔢 ${op.etiqueta || 'Cantidad [' + INSUMOS[ins].u + ']'}<input type="number" name="cantidad" min="0" step="1" required inputmode="numeric"></label>`;
+    case 'kg': return '<label class="f">⚖️ Kilos<input type="number" name="kg" step="0.1" required inputmode="decimal"></label>';
+    case 'bobinas': return '<label class="f">🧻 Bobinas<input type="number" name="bobinas" step="1" inputmode="numeric" placeholder="kg ÷ 15"></label>';
+    case 'valor': return `<label class="f">${op.id === 'sondaGasoil' ? '📏' : '🛢️'} ${op.etiqueta}<input type="number" name="valor" min="0" step="${op.id === 'sondaGasoil' ? '0.1' : '1'}" required inputmode="decimal"></label>`;
     case 'proveedor': {
-      const lista = (ST.datos ? ST.datos.proveedores : []).filter(p => p.insumo.toLowerCase() === INSUMOS[insumo].nombre.toLowerCase() && p.proveedor !== 'Envío').map(p => p.proveedor);
-      return `<label>Proveedor<select name="proveedor" ${op.provOpcional ? '' : 'required'}><option value="">${op.provOpcional ? '(sin proveedor)' : 'Elegir…'}</option>${lista.map(p => `<option>${esc(p)}</option>`).join('')}</select></label>`;
+      const lista = (ST.datos ? ST.datos.proveedores : []).filter(p => p.insumo.toLowerCase() === INSUMOS[ins].nombre.toLowerCase() && p.proveedor !== 'Envío').map(p => p.proveedor);
+      return `<label class="f">🏷️ Proveedor<select name="proveedor" ${op.provOpcional ? '' : 'required'}><option value="">${op.provOpcional ? '(sin proveedor)' : 'Elegir…'}</option>${lista.map(p => `<option>${esc(p)}</option>`).join('')}</select></label>`;
     }
-    case 'provTexto': return '<label>Proveedor<input type="text" name="proveedor" maxlength="80"></label>';
-    case 'remito': return '<label>Remito<input type="text" name="remito" maxlength="40"></label>';
-    case 'obs': return '<label class="ancho">Observaciones<input type="text" name="obs" maxlength="200"></label>';
-    case 'sobrescribir': return '<label class="check"><input type="checkbox" name="sobrescribir"> Sobrescribir si ya hay un consumo cargado</label>';
+    case 'provTexto': return '<label class="f">🏷️ Proveedor<input type="text" name="proveedor" maxlength="80"></label>';
+    case 'remito': return '<label class="f">🧾 Remito<input type="text" name="remito" maxlength="40"></label>';
+    case 'obs': return '<label class="f w2">💬 Observaciones<input type="text" name="obs" maxlength="200"></label>';
+    case 'sobrescribir': return '<label class="chk full"><span class="switch"><input type="checkbox" name="sobrescribir"><span></span></span>Sobrescribir si ya hay un consumo cargado</label>';
     default: return '';
   }
 }
 
-function opActual() {
-  const ins = $('fInsumo').value;
-  return { ins, op: OPS[ins].find(o => o.id === $('fOperacion').value) || OPS[ins][0] };
-}
-
-function renderOperaciones() {
-  const ins = $('fInsumo').value;
-  $('fOperacion').innerHTML = OPS[ins].map(o => `<option value="${o.id}">${o.nombre}</option>`).join('');
-  renderCampos();
-  renderUltimos();
-}
-
-function renderCampos() {
-  const { ins, op } = opActual();
-  $('fAyuda').textContent = op.ayuda || '';
-  $('camposDinamicos').innerHTML = op.campos.map(c => campoHtml(c, op, ins)).join('');
-  $('fPreview').textContent = '';
-  $('camposDinamicos').querySelectorAll('input,select').forEach(el => { el.oninput = actualizarPreview; });
-}
-
-function litrosSonda(cm) {
-  if (!(cm > 0)) return 0;
-  const r = 109.5, L = 10.55;
-  if (cm >= 219) return L * Math.PI * r * r / 10;
-  const h = Math.min(cm + 10.5, 2 * r);
-  return L * (r * r * Math.acos((r - h) / r) - (r - h) * Math.sqrt(2 * r * h - h * h)) / 10;
-}
-
-function actualizarPreview() {
-  const { ins, op } = opActual();
-  const fd = new FormData($('formRegistro'));
+function vistaRegistrar() {
+  if (!OPS[ST.regIns]) ST.regIns = 'tarimas';
+  const ins = ST.regIns;
+  const ops = OPS[ins];
+  if (!ops.find(o => o.id === ST.regOp)) ST.regOp = ops[0].id;
+  const op = ops.find(o => o.id === ST.regOp);
   const M = ST.modelo;
-  let t = '';
-  if (!M) { $('fPreview').textContent = ''; return; }
+  app().innerHTML = `<section class="vista">
+    <div class="hero"><div><div class="eyebrow">Carga de datos</div><h1>Registrar <span>movimiento</span></h1><p class="sub">Se escribe directo en las planillas de la planta.</p></div></div>
+    <div class="grid g-21">
+      <div class="card">
+        <div class="paso"><span class="nro">1</span><h3>¿Qué insumo?</h3></div>
+        <div class="tiles grandes" id="tIns">${ORDEN.map(i => `<button type="button" class="tile ${i === ins ? 'on' : ''}" data-ins="${i}"><span class="e">${INSUMOS[i].emoji}</span><span><b>${INSUMOS[i].nombre}</b><br><small>${M ? fmt(M[i].stock) + ' ' + INSUMOS[i].u : ''}</small></span></button>`).join('')}</div>
+        <div class="paso" style="margin-top:18px"><span class="nro">2</span><h3>¿Qué operación?</h3></div>
+        <div class="tiles" id="tOps">${ops.map(o => `<button type="button" class="tile ${o.id === op.id ? 'on' : ''}" data-op="${o.id}"><span class="e">${o.emoji}</span><b>${o.nombre}</b></button>`).join('')}</div>
+        <div class="paso" style="margin-top:18px"><span class="nro">3</span><h3>Datos</h3></div>
+        <div class="ayuda-op"><span>💡</span><span>${esc(op.ayuda || '')}</span></div>
+        <form id="formReg" autocomplete="off">
+          <div class="form">${op.campos.map(c => campoHtml(c, op, ins)).join('')}<label class="f">👤 Registrado por<input id="fUsuario" type="text" maxlength="60" placeholder="Nombre y apellido" required value="${esc(LS.get('ic_usuario', ''))}"></label></div>
+          <div class="vista-previa vacia" id="prev">👀 Completá los datos para ver cómo queda el stock</div>
+          <div class="acciones"><button class="btn" type="reset">🧹 Limpiar</button><button class="btn pri brillo" type="submit" id="btnGuardar">💾 Guardar</button></div>
+        </form>
+      </div>
+      <div class="card"><div class="card-h"><div class="t"><h3>${INSUMOS[ins].emoji} Últimos registros</h3><span class="sub">${INSUMOS[ins].nombre}</span></div></div><div class="mov-lista">${filasMov(listaMovimientos(ins).slice(0, 12), false)}</div></div>
+    </div></section>`;
+  $('tIns').querySelectorAll('[data-ins]').forEach(b => { b.onclick = () => { ST.regIns = b.dataset.ins; ST.regOp = null; vistaRegistrar(); }; });
+  $('tOps').querySelectorAll('[data-op]').forEach(b => { b.onclick = () => { ST.regOp = b.dataset.op; vistaRegistrar(); }; });
+  const f = $('formReg');
+  f.oninput = () => vistaPrevia(ins, op);
+  $('fUsuario').addEventListener('input', e => LS.set('ic_usuario', e.target.value.trim()));
+  f.onreset = () => setTimeout(() => vistaPrevia(ins, op), 0);
+  f.onsubmit = e => enviar(e, ins, op);
+}
+
+function vistaPrevia(ins, op) {
+  const el = $('prev');
+  const M = ST.modelo;
+  if (!el || !M) return;
+  const fd = new FormData($('formReg'));
+  const x = M[ins], I = INSUMOS[ins];
   const fecha = fd.get('fecha');
-  const dia = M[ins].serie.find(r => r.f === fecha);
+  const dia = x.serie.find(r => r.f === fecha);
+  let svg = '', html = '';
   if (op.id === 'sondaGasoil') {
     const cm = parseFloat(fd.get('valor'));
     if (cm > 0) {
-      const l = litrosSonda(cm);
-      t = `Equivale a ${fmt(l, 0)} L en cisterna (${fmt(l - ST.datos.params.reservaCisterna, 0)} L disponibles).`;
-      if (dia && dia.stockTot !== null) t += ` Stock teórico del día: ${fmt(dia.stockTot, 0)} L.`;
+      const l = litrosSonda(cm), disp = l - ST.datos.params.reservaCisterna;
+      svg = ilus('gasoil', disp, x);
+      html = `<b>${fmt(l)} L en cisterna</b>${fmt(disp)} L disponibles (sin reserva).${dia && dia.stockTot !== null ? `<br>Stock teórico del día: ${fmt(dia.stockTot)} L · diferencia ${fmt(l - dia.stockTot)} L.` : ''}`;
     }
   } else if (op.id === 'controlFisico') {
     const q = parseFloat(fd.get('cantidad'));
     if (dia && isFinite(q)) {
       const sis = ins === 'stretch' ? (dia.ini !== null ? dia.ini / ST.datos.params.kgPorBobina - (dia.consT1 || 0) : null) : (dia.sist !== null ? dia.sist - (dia.consT1 || 0) : null);
-      if (sis !== null) t = `Stock del sistema a las 6:00 ≈ ${fmt(sis, 0)} · ajuste resultante ${fmt(q - sis, 0)}.`;
+      if (sis !== null) html = `<div class="antes-despues"><div class="caja"><span>Sistema 6:00</span><b>${fmt(sis)}</b></div>➡️<div class="caja"><span>Contado</span><b>${fmt(q)}</b></div><div class="caja"><span>Ajuste</span><b class="${q - sis < 0 ? 'up' : 'dn'}">${fmt(q - sis)}</b></div></div>`;
     }
   } else if (op.id === 'inventario') {
     const q = parseFloat(fd.get('cantidad'));
-    const s = M[ins].ultimo;
+    const s = x.ultimo;
     if (s && isFinite(q)) {
       const sis = ins === 'stretch' ? s.stockBob : s.stock;
-      t = `Stock del sistema (${fFecha(s.f)}): ${fmt(sis, 0)} · diferencia ${pct(sis ? 100 * (sis - q) / sis : null)}.`;
+      const d = sis ? 100 * (sis - q) / sis : null;
+      html = `<div class="antes-despues"><div class="caja"><span>Sistema ${fFecha(s.f).slice(0, 5)}</span><b>${fmt(sis)}</b></div>🆚<div class="caja"><span>Físico</span><b>${fmt(q)}</b></div><div class="caja"><span>Diferencia</span><b class="${Math.abs(d || 0) > 5 ? 'up' : 'dn'}">${pct(d)}</b></div></div>`;
     }
   } else if (op.id === 'consumoStretch') {
-    if (dia && dia.consCargado) t = `Ya hay ${fmt(dia.cons, 1)} kg cargados para esa fecha.`;
-    const tar = M.tarimas.serie.find(r => r.f === fecha);
     const kg = parseFloat(fd.get('kg'));
-    if (tar && tar.cons > 0 && kg > 0) t += ` ${fmt(1000 * kg / tar.cons, 0)} g/pallet sobre ${fmt(tar.cons)} pallets.`;
+    const tar = M.tarimas.serie.find(r => r.f === fecha);
+    const partes = [];
+    if (dia && dia.consCargado) partes.push(`⚠️ Ya hay ${fmt(dia.cons, 1)} kg cargados para esa fecha.`);
+    if (tar && tar.cons > 0 && kg > 0) partes.push(`<b>${fmt(1000 * kg / tar.cons)} g/pallet</b>sobre ${fmt(tar.cons)} pallets producidos ese día.`);
+    html = partes.join('<br>');
   } else {
     const q = parseFloat(fd.get('cantidad') || fd.get('kg') || fd.get('valor'));
-    const s = M[ins].ultimo;
+    const s = x.ultimo;
     if (s && isFinite(q)) {
       const signo = /envio|descarte/i.test(op.id) ? -1 : 1;
-      t = `Stock actual ${fmt(s.stock, 0)} ${INSUMOS[ins].u} → ${fmt(s.stock + signo * q, 0)} ${INSUMOS[ins].u}.`;
+      const nuevo = s.stock + signo * q;
+      svg = ilus(ins, nuevo, x);
+      html = `<div class="antes-despues"><div class="caja"><span>Stock actual</span><b>${fmt(s.stock)}</b></div>${signo > 0 ? '➕' : '➖'}<div class="caja"><span>${signo > 0 ? 'Ingresa' : 'Sale'}</span><b>${fmt(q, I.dec)}</b></div>🟰<div class="caja"><span>Queda</span><b>${fmt(nuevo)} ${I.u}</b></div></div><div class="sub" style="margin-top:6px">⏳ ${fmt(x.medio ? nuevo / x.medio : null, 1)} días de cobertura</div>`;
     }
   }
-  $('fPreview').textContent = t.trim();
+  if (!html) { el.className = 'vista-previa vacia'; el.innerHTML = '👀 Completá los datos para ver cómo queda el stock'; return; }
+  el.className = 'vista-previa' + (svg ? '' : ' sin-ilus');
+  el.style.gridTemplateColumns = svg ? '' : '1fr';
+  el.innerHTML = (svg ? `<div class="${x.estado === 'na' ? '' : ''}" style="--est:var(--c-${ins})">${svg}</div>` : '') + `<div class="txt">${html}</div>`;
 }
 
-async function enviarRegistro(e) {
+async function enviar(e, ins, op) {
   e.preventDefault();
-  const { ins, op } = opActual();
-  const fd = new FormData($('formRegistro'));
+  const fd = new FormData($('formReg'));
   const usuario = $('fUsuario').value.trim();
   LS.set('ic_usuario', usuario);
   const p = { accion: op.id, insumo: ins, usuario };
   op.campos.forEach(c => { if (c === 'sobrescribir') p.sobrescribir = fd.get('sobrescribir') === 'on'; else if (c === 'provTexto') p.proveedor = fd.get('proveedor'); else p[c] = fd.get(c); });
-  const btn = $('btnGuardar');
-  btn.disabled = true;
-  btn.textContent = 'Guardando…';
+  const b = $('btnGuardar');
+  b.disabled = true;
+  b.textContent = '⏳ Guardando…';
+  loader(true);
   try {
     const msg = await apiPost(p);
-    toast(msg || 'Registrado');
-    renderCampos();
+    toast(msg || 'Registrado', 'ok');
     await cargar(true);
   } catch (err) {
-    toast(err.message, true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Guardar';
-  }
+    toast(err.message, 'bad');
+    b.disabled = false;
+    b.textContent = '💾 Guardar';
+  } finally { loader(false); }
 }
 
-function listaMovimientos(ins) {
-  const M = ST.modelo;
-  if (!M) return [];
-  const x = M[ins], u = INSUMOS[ins].u;
-  let l = [];
-  if (ins === 'gasoil') {
-    l = x.movs.map(m => ({ f: m.f, tipo: m.tipo, det: m.tipo === 'Medición sonda' ? `${fmt(m.valor, 1)} cm → ${fmt(m.litros, 0)} L` : `${fmt(m.cant, 0)} L`, q: m.tipo === 'Medición sonda' ? m.valor : m.cant, prov: m.hora || '', obs: m.obs, hoja: m.hoja, fila: m.fila }));
-  } else {
-    l = x.movs.map(m => ({ f: m.f, tipo: m.tipo, det: `${fmt(m.cant, INSUMOS[ins].dec)} ${u}` + (m.bob ? ` · ${fmt(m.bob, 0)} bob.` : ''), q: m.cant, prov: m.prov, remito: m.remito, obs: m.obs, hoja: m.hoja, fila: m.fila }));
-    if (x.descarte) l = l.concat(x.descarte.map(m => ({ f: m.f, tipo: 'Descarte', det: `${fmt(m.cant)} ${u}`, q: m.cant, prov: m.prov, obs: m.obs, hoja: m.hoja, fila: m.fila })));
-    l = l.concat(x.serie.filter(r => r.ctrl !== null && r.ctrl !== undefined).map(r => ({ f: r.f, tipo: 'Control físico', det: `${fmt(r.ctrl, 0)} ${ins === 'stretch' ? 'bob.' : u}` + (r.aj !== null ? ` · ajuste ${fmt(r.aj, 0)}` : ''), prov: '', obs: '' })));
-    if (x.inventario) l = l.concat(x.inventario.map(r => ({ f: r.f, tipo: 'Inventario', det: `${fmt(r.fis, 0)} vs. ${fmt(r.sis, 0)} sistema`, prov: '', obs: '' })));
-  }
-  return l.sort((a, b) => (a.f < b.f ? 1 : a.f > b.f ? -1 : (b.fila || 0) - (a.fila || 0)));
+function filasMov(l, conAnular) {
+  if (!l.length) return '<div class="empty">📭 Sin registros</div>';
+  return l.map(m => `<div class="mov ${esc(m.tipo)}"><span class="e">${EMOJI_TIPO[m.tipo] || '•'}</span>
+    <div class="t"><b>${esc(m.tipo)}</b> <span class="sub">· ${fFecha(m.f)}${m.prov ? ' · ' + esc(m.prov) : ''}</span><div class="sub">${[m.remito ? '🧾 ' + esc(m.remito) : '', m.obs ? '💬 ' + esc(m.obs) : ''].filter(Boolean).join(' · ') || '&nbsp;'}</div></div>
+    <div class="q">${esc(m.det)}${conAnular && m.hoja ? `<button class="btn sm dan" data-anular="${m.hoja}|${m.fila}|${m.f}|${m.q}">🗑️ Anular</button>` : ''}</div></div>`).join('');
 }
 
-function filasMovs(l, conAnular) {
-  return l.map(m => `<tr><td>${fFecha(m.f)}</td><td class="txt">${esc(m.tipo)}</td><td>${esc(m.det)}</td><td class="txt">${esc(m.prov || '')}</td><td class="txt">${esc(m.remito || '')}</td><td class="txt">${esc(m.obs || '')}</td>${conAnular ? `<td>${m.hoja ? `<button class="btn ghost mini" data-anular="${m.hoja}|${m.fila}|${m.f}|${m.q}">Anular</button>` : ''}</td>` : ''}</tr>`).join('');
+function vistaMovimientos() {
+  const ins = ST.movIns;
+  const fl = ST.movFiltro || { desde: '', hasta: '', q: '' };
+  app().innerHTML = `<section class="vista">
+    <div class="hero"><div><div class="eyebrow">Historial</div><h1>Movi<span>mientos</span></h1><p class="sub">Ingresos, envíos, descartes, controles e inventarios.</p></div></div>
+    <div class="bar"><div class="seg" id="segMov">${ORDEN.map(i => `<button data-ins="${i}" class="${i === ins ? 'on' : ''}"><span>${INSUMOS[i].emoji}</span>${INSUMOS[i].nombre}</button>`).join('')}</div>
+      <div class="filtros"><label class="f">Desde<input type="date" id="mDesde" value="${fl.desde}"></label><label class="f">Hasta<input type="date" id="mHasta" value="${fl.hasta}"></label><label class="f ancho">🔎 Buscar<input type="search" id="mBuscar" placeholder="Proveedor, remito, obs." value="${esc(fl.q)}"></label></div></div>
+    <div class="card"><div class="mov-lista" id="listaMov"></div><p class="nota" id="movNota"></p></div></section>`;
+  $('segMov').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.movIns = b.dataset.ins; vistaMovimientos(); }; });
+  requestAnimationFrame(() => moverPill($('segMov')));
+  ['mDesde', 'mHasta', 'mBuscar'].forEach(i => { $(i).oninput = filtrarMov; });
+  filtrarMov();
 }
 
-function renderUltimos() {
-  const ins = $('fInsumo').value;
-  const l = listaMovimientos(ins).slice(0, 10);
-  $('tablaUltimos').innerHTML = `<thead><tr><th>Fecha</th><th class="txt">Tipo</th><th>Detalle</th><th class="txt">${ins === 'gasoil' ? 'Hora' : 'Proveedor'}</th><th class="txt">Remito</th><th class="txt">Obs.</th></tr></thead><tbody>${filasMovs(l, false) || '<tr><td colspan="6" class="vacio">Sin registros</td></tr>'}</tbody>`;
-}
-
-function renderMovimientos() {
-  const ins = $('mInsumo').value, desde = $('mDesde').value, hasta = $('mHasta').value, q = $('mBuscar').value.trim().toLowerCase();
+function filtrarMov() {
+  const ins = ST.movIns;
+  const fl = ST.movFiltro = { desde: $('mDesde').value, hasta: $('mHasta').value, q: $('mBuscar').value.trim() };
   let l = listaMovimientos(ins);
-  if (desde) l = l.filter(m => m.f >= desde);
-  if (hasta) l = l.filter(m => m.f <= hasta);
-  if (q) l = l.filter(m => [m.tipo, m.prov, m.remito, m.obs, m.det].join(' ').toLowerCase().includes(q));
+  if (fl.desde) l = l.filter(m => m.f >= fl.desde);
+  if (fl.hasta) l = l.filter(m => m.f <= fl.hasta);
+  if (fl.q) { const q = fl.q.toLowerCase(); l = l.filter(m => [m.tipo, m.prov, m.remito, m.obs, m.det].join(' ').toLowerCase().includes(q)); }
   const total = l.length;
-  l = l.slice(0, 300);
-  $('tablaMovs').innerHTML = `<thead><tr><th>Fecha</th><th class="txt">Tipo</th><th>Detalle</th><th class="txt">${ins === 'gasoil' ? 'Hora' : 'Proveedor'}</th><th class="txt">Remito</th><th class="txt">Obs.</th><th></th></tr></thead><tbody>${filasMovs(l, true) || '<tr><td colspan="7" class="vacio">Sin registros</td></tr>'}</tbody>`;
-  $('movsNota').textContent = total > 300 ? `Se muestran 300 de ${total} registros. Filtrá por fecha para ver el resto.` : `${total} registros. Los controles físicos e inventarios se corrigen desde la planilla.`;
-  $('tablaMovs').querySelectorAll('[data-anular]').forEach(b => {
+  $('listaMov').innerHTML = filasMov(l.slice(0, 200), true);
+  $('movNota').textContent = total > 200 ? `Se muestran 200 de ${total} registros. Filtrá por fecha para ver el resto.` : `${total} registros. Los controles físicos e inventarios se corrigen desde la planilla.`;
+  $('listaMov').querySelectorAll('[data-anular]').forEach(b => {
     b.onclick = async () => {
-      const [hoja, fila, f, qq] = b.dataset.anular.split('|');
-      if (!(await confirmar(`¿Anular el registro del ${fFecha(f)} (${qq})? Se elimina la fila ${fila} de la planilla.`))) return;
-      try {
-        toast(await apiPost({ accion: 'anular', hoja, fila: +fila, fecha: f, cantidad: +qq, usuario: LS.get('ic_usuario', '') }));
-        await cargar(true);
-      } catch (err) { toast(err.message, true); }
+      const [hoja, fila, f, q] = b.dataset.anular.split('|');
+      if (!(await confirmar(`¿Anular el registro del ${fFecha(f)} (${fmt(+q, 1)})? Se elimina la fila ${fila} de la planilla.`))) return;
+      loader(true);
+      try { toast(await apiPost({ accion: 'anular', hoja, fila: +fila, fecha: f, cantidad: +q, usuario: LS.get('ic_usuario', '') }), 'ok'); await cargar(true); }
+      catch (err) { toast(err.message, 'bad'); }
+      finally { loader(false); }
     };
   });
 }
 
-function renderParametros() {
+function vistaParametros() {
   const M = ST.modelo;
-  $('tablaParams').innerHTML = '<thead><tr><th>Insumo</th><th>Consumo medio</th><th>Días SS</th><th>Días PP</th><th>Stock de seguridad</th><th>Punto de pedido</th><th>Stock actual</th><th></th></tr></thead><tbody>' +
-    ORDEN.map(id => {
+  const c = conexion();
+  app().innerHTML = `<section class="vista">
+    <div class="hero"><div><div class="eyebrow">Configuración</div><h1>Ajustes de <span>reposición</span></h1><p class="sub">Stock de seguridad = días SS × consumo medio · Punto de pedido = días PP × consumo medio. Se guardan en la hoja «Necesidades».</p></div></div>
+    <div class="param-grid stagger">${ORDEN.map((id, i) => {
       const x = M[id], I = INSUMOS[id];
-      return `<tr><td>${I.nombre}${x.paramGuardado ? '' : ' <span class="pill na">por defecto</span>'}</td><td>${fmt(x.medio, I.dec)} ${I.u}/día</td>
-        <td><input type="number" min="1" step="1" value="${x.diasSS}" id="pSS-${id}" style="width:70px"></td>
-        <td><input type="number" min="1" step="1" value="${x.diasPP}" id="pPP-${id}" style="width:70px"></td>
-        <td>${fmt(x.ss)} ${I.u}</td><td>${fmt(x.pp)} ${I.u}</td><td>${fmt(x.stock)} ${I.u}</td>
-        <td><button class="btn mini" data-param="${id}">Guardar</button></td></tr>`;
-    }).join('') + '</tbody>';
-  $('tablaParams').querySelectorAll('[data-param]').forEach(b => {
-    b.onclick = async () => {
-      const id = b.dataset.param;
+      return `<div class="card param" style="--c:var(--c-${id});--i:${i}" data-id="${id}">
+        <div class="ins-cab"><span class="ins-ico">${I.emoji}</span><div><h3>${I.nombre}</h3><div class="sub">Consumo medio ${fmt(x.medio, I.dec)} ${I.u}/día</div></div>${x.paramGuardado ? '' : '<span class="tag t-mut">por defecto</span>'}</div>
+        ${['SS', 'PP'].map(k => `<div class="stepper-fila"><div class="l">${k === 'SS' ? '🛡️ Stock de seguridad' : '🛒 Punto de pedido'}<small>días de consumo</small></div>
+          <div class="stepper"><button type="button" data-paso="-1" data-k="${k}">−</button><input type="number" min="1" step="1" value="${k === 'SS' ? x.diasSS : x.diasPP}" data-k="${k}"><button type="button" data-paso="1" data-k="${k}">+</button></div></div>`).join('')}
+        <div class="calc"><div><span>SS</span><b data-o="SS">${fmt(x.ss)}</b></div><div><span>PP</span><b data-o="PP">${fmt(x.pp)}</b></div><div><span>Stock</span><b>${fmt(x.stock)}</b></div></div>
+        <button class="btn pri" data-guardar="${id}">💾 Guardar</button></div>`;
+    }).join('')}</div>
+    <div class="card" style="margin-top:16px"><div class="card-h"><div class="t"><h3>🔌 Conexión</h3><span class="sub">URL de la aplicación web de Apps Script y clave de acceso (se guardan solo en este navegador)</span></div></div>
+      <form class="form" id="formCx" autocomplete="off"><label class="f w2">URL /exec<input id="cUrl" type="url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="f">Clave<input id="cKey" type="password" value="${esc(c.key || '')}" placeholder="Opcional"></label>
+      <div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">🔌 Guardar y probar</button></div></form></div>
+  </section>`;
+  app().querySelectorAll('.param').forEach(card => {
+    const id = card.dataset.id, x = M[id];
+    const recalc = () => {
+      ['SS', 'PP'].forEach(k => { const v = +card.querySelector(`input[data-k="${k}"]`).value; card.querySelector(`[data-o="${k}"]`).textContent = x.medio ? fmt(Math.ceil(v * x.medio)) : '—'; });
+    };
+    card.querySelectorAll('[data-paso]').forEach(b => { b.onclick = () => { const inp = card.querySelector(`input[data-k="${b.dataset.k}"]`); inp.value = Math.max(1, (+inp.value || 0) + +b.dataset.paso); recalc(); }; });
+    card.querySelectorAll('input').forEach(i => { i.oninput = recalc; });
+    card.querySelector('[data-guardar]').onclick = async ev => {
+      const b = ev.currentTarget;
       b.disabled = true;
+      loader(true);
       try {
-        toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +$('pSS-' + id).value, diasPP: +$('pPP-' + id).value, usuario: LS.get('ic_usuario', '') }));
+        toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +card.querySelector('input[data-k="SS"]').value, diasPP: +card.querySelector('input[data-k="PP"]').value, usuario: LS.get('ic_usuario', '') }), 'ok');
         await cargar(true);
-      } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
+      } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { loader(false); }
     };
   });
-}
-
-function irTab(tab) {
-  if (INSUMOS[tab]) { ST.insumo = tab; ST.tab = tab; } else ST.tab = tab;
-  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
-  document.querySelectorAll('.tab').forEach(s => s.classList.remove('activo'));
-  const sec = INSUMOS[tab] ? 'insumo' : tab;
-  $('tab-' + sec).classList.add('activo');
-  if (location.hash !== '#' + tab) history.replaceState(null, '', '#' + tab);
-  render();
-  window.scrollTo(0, 0);
-}
-
-function render() {
-  if (!ST.modelo) return;
-  if (ST.tab === 'resumen') renderResumen();
-  else if (INSUMOS[ST.tab]) renderInsumo();
-  else if (ST.tab === 'registrar') { renderUltimos(); actualizarPreview(); }
-  else if (ST.tab === 'movimientos') renderMovimientos();
-  else if (ST.tab === 'parametros') renderParametros();
-}
-
-async function cargar(forzar) {
-  const est = $('estado');
-  if (!forzar) {
-    const cache = LS.get('ic_cache', null);
-    if (cache) aplicarDatos(cache, true);
-  }
-  est.textContent = 'Actualizando…';
-  try {
-    const d = await apiGet();
-    LS.set('ic_cache', d);
-    aplicarDatos(d, false);
-  } catch (err) {
-    est.textContent = ST.datos ? 'Sin conexión · datos guardados' : 'Sin datos';
-    toast(err.message, true);
-    if (!ST.datos && !conexion().url) irTab('parametros');
-  }
-}
-
-function aplicarDatos(d, desdeCache) {
-  ST.datos = d;
-  ST.modelo = construirModelo(d);
-  const t = new Date(d.generado);
-  $('estado').textContent = (desdeCache ? 'Guardado ' : 'Actualizado ') + t.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  render();
-}
-
-function init() {
-  $('planta').textContent = CONF.PLANTA || '';
-  document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => irTab(b.dataset.tab); });
-  document.querySelectorAll('#periodos button').forEach(b => { b.onclick = () => { ST.per = b.dataset.per; render(); }; });
-  $('btnRefrescar').onclick = () => cargar(true);
-  $('fInsumo').onchange = renderOperaciones;
-  $('fOperacion').onchange = () => { renderCampos(); };
-  $('formRegistro').onsubmit = enviarRegistro;
-  $('formRegistro').onreset = () => setTimeout(renderCampos, 0);
-  $('fUsuario').value = LS.get('ic_usuario', '');
-  ['mInsumo', 'mDesde', 'mHasta', 'mBuscar'].forEach(i => { $(i).oninput = renderMovimientos; });
-  const c = conexion();
-  $('cUrl').value = c.url || '';
-  $('cKey').value = c.key || '';
-  $('formConexion').onsubmit = async e => {
+  $('formCx').onsubmit = async e => {
     e.preventDefault();
     LS.set('ic_url', $('cUrl').value.trim());
     LS.set('ic_key', $('cKey').value.trim());
     await cargar(true);
-    if (ST.datos) toast('Conexión correcta');
+    if (ST.datos) toast('Conexión correcta', 'ok');
   };
-  renderOperaciones();
-  const h = location.hash.replace('#', '');
-  irTab(h && (INSUMOS[h] || $('tab-' + h)) ? h : 'resumen');
+}
+
+function vistaSinDatos() {
+  const c = conexion();
+  app().innerHTML = `<section class="vista"><div class="hero"><div><div class="eyebrow">Primer uso</div><h1>Conectar con la <span>planilla</span></h1><p class="sub">Pegá la URL /exec de la aplicación web de Apps Script.</p></div></div>
+    <div class="card"><form class="form" id="formCx0"><label class="f w2">URL /exec<input id="cUrl0" type="url" value="${esc(c.url || '')}" required></label><label class="f">Clave<input id="cKey0" type="password" value="${esc(c.key || '')}"></label><div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">🔌 Conectar</button></div></form></div></section>`;
+  $('formCx0').onsubmit = async e => { e.preventDefault(); LS.set('ic_url', $('cUrl0').value.trim()); LS.set('ic_key', $('cKey0').value.trim()); await cargar(true); };
+}
+
+function leerRuta() {
+  const h = location.hash.replace(/^#\/?/, '') || 'resumen';
+  return VISTAS.find(v => v.id === h) ? h : 'resumen';
+}
+
+function render() {
+  ST.vista = leerRuta();
+  if (INSUMOS[ST.vista]) ST.insumo = ST.vista;
+  pintarNav();
+  destruirTodos();
+  if (!ST.modelo) { if (ST.vista === 'parametros' || !conexion().url) vistaSinDatos(); return; }
+  const v = ST.vista;
+  if (v === 'resumen') vistaResumen();
+  else if (INSUMOS[v]) vistaInsumo(v);
+  else if (v === 'registrar') vistaRegistrar();
+  else if (v === 'movimientos') vistaMovimientos();
+  else if (v === 'parametros') vistaParametros();
+}
+
+function ocultarSplash() {
+  const s = $('splash');
+  if (s && !s.classList.contains('fuera')) { s.classList.add('fuera'); clearInterval(ocultarSplash._t); }
+}
+
+async function cargar(forzar) {
+  if (!forzar) {
+    const cache = LS.get('ic_cache', null);
+    if (cache) { aplicar(cache, true); ocultarSplash(); }
+  }
+  if (!conexion().url) { ocultarSplash(); estadoRed('off', 'Sin conexión'); render(); return; }
+  loader(true);
+  estadoRed('cache', 'Actualizando');
+  try {
+    const d = await apiGet();
+    LS.set('ic_cache', d);
+    aplicar(d, false);
+  } catch (err) {
+    estadoRed(ST.datos ? 'cache' : 'off', ST.datos ? 'Datos guardados' : 'Sin conexión');
+    toast(err.message, 'bad');
+    if (!ST.datos) render();
+  } finally {
+    loader(false);
+    ocultarSplash();
+  }
+}
+
+function aplicar(d, desdeCache) {
+  ST.datos = d;
+  ST.modelo = construirModelo(d);
+  const t = new Date(d.generado);
+  const hh = t.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  estadoRed(desdeCache ? 'cache' : 'ok', (desdeCache ? 'Guardado ' : 'En línea · ') + hh);
+  render();
+}
+
+function init() {
+  ST.per = LS.get('ic_per', 'hist');
+  $('btnTema').textContent = temaActual() === 'dark' ? '☀️' : '🌙';
+  $('btnTema').onclick = alternarTema;
+  $('btnRefrescar').onclick = () => cargar(true);
+  let i = 0;
+  ocultarSplash._t = setInterval(() => { $('splashTxt').textContent = FRASES[++i % FRASES.length]; }, 900);
+  reloj();
+  setInterval(reloj, 30000);
+  window.addEventListener('hashchange', () => { render(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  window.addEventListener('resize', () => { moverPill($('nav')); document.querySelectorAll('main .seg').forEach(moverPill); });
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!document.documentElement.getAttribute('data-theme')) render(); });
+  if (!location.hash) history.replaceState(null, '', '#/resumen');
+  render();
   cargar(false);
 }
 
