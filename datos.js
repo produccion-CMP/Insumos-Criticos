@@ -44,10 +44,15 @@ const fMes = m => MESES[+m.slice(5, 7) - 1] + ' ' + m.slice(2, 4);
 
 async function apiGet() {
   const { url, key } = conexion();
-  if (!url) throw new Error('Configurá la URL de Apps Script en la pestaña Parámetros');
-  const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key || '') + '&t=' + Date.now());
+  if (!url) throw new Error('Configurá la URL de Apps Script en Administración → Conexión');
+  const ses = sesion();
+  const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key || '') + (ses ? '&token=' + encodeURIComponent(ses.token) : '') + '&t=' + Date.now());
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'Error al leer los datos');
+  if (ses) {
+    if (!j.perfil) { LS.set('ic_ses', null); if (window.onSesionVencida) window.onSesionVencida(); }
+    else LS.set('ic_ses', Object.assign({}, ses, j.perfil));
+  }
   return j.data;
 }
 
@@ -55,11 +60,13 @@ function sesion() {
   const s = LS.get('ic_ses', null);
   return s && s.token && s.vence > Date.now() ? s : null;
 }
-const esAdmin = () => !!sesion();
+const esAdmin = () => { const s = sesion(); return !!(s && s.rol === 'admin'); };
+const puedeRegistrar = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.rol === 'operador')); };
+const verInventario = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.verInventario)); };
 
 async function apiPost(payload) {
   const { url, key } = conexion();
-  if (!url) throw new Error('Configurá la URL de Apps Script en la pestaña Parámetros');
+  if (!url) throw new Error('Configurá la URL de Apps Script en Administración › Conexión');
   const ses = sesion();
   const r = await fetch(url, { method: 'POST', body: JSON.stringify(Object.assign({ key, token: ses ? ses.token : null }, payload)) });
   const j = await r.json();
@@ -75,19 +82,20 @@ function construirModelo(D) {
   const hoy = D.hoy;
   const fin = isoDn(dn(hoy) - 1);
   M.hoy = hoy;
+  M.conInventario = !!(D.tarimas.inventario || D.stretch.inventario);
   M.fin = fin;
 
   M.tarimas = {
     serie: D.tarimas.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, env: r[3] || 0, cons: r[4] || 0, desc: r[5] || 0, sist: r[6], ctrl: r[7], consT1: r[8], aj: r[9], stock: r[10] })),
     movs: D.tarimas.movs.map(r => ({ hoja: 'movTarimas', fila: r[0], f: r[1], cant: r[2], prov: r[3], remito: r[4], obs: r[5], tipo: r[3] === 'Envío' ? 'Envío' : 'Ingreso' })),
     descarte: D.tarimas.descarte.map(r => ({ hoja: 'descarteTarimas', fila: r[0], f: r[1], cant: r[2], prov: r[3], obs: r[4], tipo: 'Descarte' })),
-    inventario: D.tarimas.inventario.map(r => ({ f: r[0], fis: r[1], sis: r[2] }))
+    inventario: (D.tarimas.inventario || []).map(r => ({ f: r[0], fis: r[1], sis: r[2] }))
   };
 
   M.stretch = {
     serie: D.stretch.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, ingBob: r[3] || 0, env: r[4] || 0, envBob: r[5] || 0, cons: r[6] || 0, consBob: r[7] || 0, sist: r[8], ctrl: r[9], consT1: r[10], aj: r[11], stock: r[12], stockBob: r[13], consCargado: r[6] !== null })),
     movs: D.stretch.movs.map(r => ({ hoja: 'movStretch', fila: r[0], f: r[1], cant: r[2], bob: r[3], prov: r[4], remito: r[5], obs: r[6], tipo: r[4] === 'Envío' ? 'Envío' : (r[2] < 0 ? 'Devolución' : 'Ingreso') })),
-    inventario: D.stretch.inventario.map(r => ({ f: r[0], fis: r[1], sis: r[2] }))
+    inventario: (D.stretch.inventario || []).map(r => ({ f: r[0], fis: r[1], sis: r[2] }))
   };
 
   M.cal = {

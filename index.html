@@ -40,21 +40,23 @@
   <div id="toploader"><span></span></div>
 
   <header class="top">
-    <a class="brand" href="#/resumen">
-      <span class="logo-tile"><img src="img/logo-cmp.png" alt=""></span>
-      <div>Insumos Críticos<small>Tarimas · Stretch · Gasoil · Cal</small></div>
-    </a>
-    <nav class="nav" id="nav" aria-label="Secciones"></nav>
-    <div class="top-right">
-      <div class="reloj" id="reloj" title="Turno actual">
-        <b id="relojHora">--:--</b>
-        <div><span class="turno" id="relojTurno">T-</span><small id="relojRango"></small><i><span id="relojAvance"></span></i></div>
+    <div class="top-fila">
+      <a class="brand" href="#/resumen">
+        <span class="logo-tile"><img src="img/logo-cmp.png" alt=""></span>
+        <div>Insumos Críticos<small>Cerámica Marcos Paz · Planta Cevil</small></div>
+      </a>
+      <div class="top-right">
+        <div class="reloj" id="reloj" title="Turno actual">
+          <b id="relojHora">--:--</b>
+          <div><span class="turno" id="relojTurno">T-</span><small id="relojRango"></small><i><span id="relojAvance"></span></i></div>
+        </div>
+        <span class="estado-red" id="red"><i></i><span>Conectando</span></span>
+        <button class="btn ghost sm" id="btnRefrescar" title="Volver a leer la planilla">Actualizar</button>
+        <button class="btn ghost sm" id="btnTema" title="Cambiar tema claro u oscuro">Modo oscuro</button>
+        <button class="btn sm sesion" id="btnSesion"></button>
       </div>
-      <span class="estado-red" id="red"><i></i><span>Conectando</span></span>
-      <button class="btn ghost icon" id="btnRefrescar" title="Actualizar datos" aria-label="Actualizar datos">🔄</button>
-      <button class="btn ghost icon" id="btnTema" title="Cambiar tema claro u oscuro" aria-label="Cambiar tema">🌙</button>
-      <button class="btn sm sesion" id="btnSesion"></button>
     </div>
+    <nav class="nav" id="nav" aria-label="Secciones"></nav>
   </header>
 
   <main id="app"></main>
@@ -72,5 +74,12 @@
       </div>
     </form>
   </dialog>
+
+  <div id="pop" role="tooltip"></div>
+  <dialog id="dlgGlosario">
+    <div class="glos-cab"><h3>📖 Abreviaturas y criterios</h3><button class="btn ghost sm" id="glosCerrar">Cerrar</button></div>
+    <dl id="glosarioLista"></dl>
+  </dialog>
+  <div id="print" aria-hidden="true"></div>
 </body>
 </html>

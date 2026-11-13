@@ -716,3 +716,100 @@ table.comp td:first-child { font-weight: 700; }
 
 .mov .t { overflow: hidden; }
 .mov .q { white-space: nowrap; }
+
+/* ===== v4 · Encabezado en palabras (dos filas) ===== */
+:root { --top-h: 104px; }
+.top { height: auto; display: block; padding: 0; }
+.top-fila { display: flex; align-items: center; gap: 16px; padding: 8px 20px; max-width: 1320px; margin: 0 auto; }
+.top-fila .top-right { margin-left: auto; }
+.top .nav { max-width: 1320px; margin: 0 auto; padding: 0 16px 6px; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.top .nav::-webkit-scrollbar { display: none; }
+.nav a { padding: 7px 13px; font-size: .9rem; }
+.nav a .tx { display: inline; }
+.nav .pill { top: 0; bottom: 6px; }
+.brand > div { font-size: 1.02rem; line-height: 1.15; }
+.top-right .btn.sm { font-weight: 700; }
+@media screen and (max-width: 1080px) { .top-right #btnTema { display: none; } }
+@media screen and (max-width: 720px) {
+  :root { --top-h: 56px; }
+  .top-fila { padding: 7px 14px; gap: 8px; }
+  .top .nav { display: none; }
+  .brand > div { font-size: .95rem; }
+  #btnRefrescar { display: none; }
+  .bottom-nav a { font-size: .66rem; }
+}
+
+/* ===== v4 · Ayuda "?" en KPI y tarjetas ===== */
+.kpi, .card-h { position: relative; }
+.ayuda-btn { position: absolute; top: 8px; right: 8px; z-index: 2; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--panel); color: var(--muted); font: 800 .7rem/1 inherit; display: grid; place-items: center; cursor: pointer; padding: 0; transition: color .2s, border-color .2s, transform .2s var(--spring); }
+.ayuda-btn:hover, .ayuda-btn:focus-visible { color: var(--accent); border-color: var(--accent); transform: scale(1.1); outline: none; }
+.card-h .ayuda-btn { position: static; flex: none; margin-left: auto; }
+.kpi .l { padding-right: 22px; }
+#pop { position: fixed; z-index: 900; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-hi); padding: 12px 14px; font-size: .84rem; line-height: 1.45; opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .18s, transform .18s, visibility .18s; }
+#pop.on { opacity: 1; visibility: visible; transform: none; }
+#pop b { display: block; margin-bottom: 4px; color: var(--accent); }
+#pop p { margin: 0 0 6px; color: var(--text); }
+#pop a { font-size: .76rem; font-weight: 700; color: var(--accent); }
+#dlgGlosario { width: min(640px, 94vw); max-height: 84vh; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); padding: 0; box-shadow: var(--shadow-hi); }
+#dlgGlosario::backdrop { background: rgba(0, 0, 0, .35); backdrop-filter: blur(3px); }
+.glos-cab { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.glos-cab h3 { font-size: 1rem; }
+#glosarioLista { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; padding: 14px 18px 20px; margin: 0; font-size: .86rem; }
+#glosarioLista dt { font-weight: 800; color: var(--accent); white-space: nowrap; }
+#glosarioLista dd { margin: 0; color: var(--text); }
+.hero-der { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.hero-acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ===== v4 · Usuarios ===== */
+.login-nota { font-size: .75rem; color: var(--muted); margin-top: 10px; }
+tr.inactivo td { opacity: .55; }
+.muted { color: var(--muted); }
+.datos-u { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0 0 16px; font-size: .9rem; }
+.datos-u dt { color: var(--muted); font-weight: 700; }
+.datos-u dd { margin: 0; font-weight: 700; }
+.tag.t-acc { background: var(--accent-soft); color: var(--accent); }
+
+/* ===== v4 · Informes por apartado ===== */
+.inf-ctrl { margin: 0 0 16px; }
+.inf-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.inf-kpi { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; display: flex; flex-direction: column; gap: 1px; break-inside: avoid; }
+.inf-kpi span { font-size: 7.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 800; }
+.inf-kpi b { font-size: 14px; letter-spacing: -.02em; }
+.inf-kpi small { font-size: 8px; color: var(--muted); }
+.inf-kpi.bad b { color: var(--bad); }
+.inf-est-1 { display: grid; grid-template-columns: 70px 1fr auto; gap: 12px; align-items: center; border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 8px; padding: 9px 12px; }
+.inf-est-1 .ilus { width: 70px; height: 70px; }
+.inf-est-1.ok { --est: var(--ok); --est-soft: var(--ok-soft); }
+.inf-est-1.warn { --est: var(--warn); --est-soft: var(--warn-soft); }
+.inf-est-1.bad { --est: var(--bad); --est-soft: var(--bad-soft); }
+.inf-est-1 .inf-stock { font-size: 22px; }
+.inf-est-1 dl { display: grid; grid-template-columns: auto auto; gap: 1px 10px; margin: 0; font-size: 9px; }
+.inf-est-1 dt { color: var(--muted); font-weight: 700; }
+.inf-est-1 dd { margin: 0; font-weight: 800; text-align: right; }
+.inf-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.inf-2 h4 { font-size: 9.5px; color: var(--muted); margin-bottom: 4px; }
+.inf-chart.medio { height: 150px; }
+.inf-glos { display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 2px 8px; margin: 0; font-size: 8.5px; }
+.inf-glos dt { font-weight: 800; color: var(--accent); }
+.inf-glos dd { margin: 0; color: var(--muted); }
+.informe .ayuda-btn { display: none; }
+#print { position: absolute; left: -10000px; top: 0; width: 210mm; }
+@media screen and (max-width: 720px) {
+  .inf-kpis { grid-template-columns: 1fr 1fr; }
+  .inf-2, .inf-est-1 { grid-template-columns: 1fr; }
+  .inf-glos { grid-template-columns: max-content 1fr; }
+}
+@media print {
+  @page { size: A4; margin: 9mm 0 10mm; }
+  .informe { padding-top: 2mm !important; padding-bottom: 0 !important; }
+  .inf-glos div, .inf-glos dt { break-inside: avoid; }
+  .inf-pie { break-before: avoid; }
+  body.imprimiendo > *:not(#print) { display: none !important; }
+  body.imprimiendo #print { position: static; left: auto; width: auto; display: block !important; }
+  #print .informe { width: 210mm; }
+  .inf-kpis, .inf-est-1, .inf-2 { break-inside: avoid; }
+  #pop, #dlgGlosario { display: none !important; }
+}
+.ins-cab .ayuda-btn { position: static; flex: none; margin-left: 4px; }
+.ins-cab .est-tag { margin-left: auto; }
+@media screen and (max-width: 480px) { .top-fila .reloj { display: none; } .top-fila .estado-red { padding: 4px; } }
