@@ -6,16 +6,21 @@ const VISTAS = [
   { id: 'stretch', e: '🧻', n: 'Stretch' },
   { id: 'gasoil', e: '⛽', n: 'Gasoil' },
   { id: 'cal', e: '🪣', n: 'Cal' },
-  { id: 'registrar', e: '➕', n: 'Registrar' },
+  { id: 'informe', e: '🖨️', n: 'Informe' },
   { id: 'movimientos', e: '🧾', n: 'Movimientos' },
-  { id: 'parametros', e: '⚙️', n: 'Ajustes' }
+  { id: 'admin', e: '🔐', n: 'Administración' }
 ];
 const BNAV = [
   { id: 'resumen', e: '🏠', n: 'Inicio' },
   { id: 'insumo', e: '📦', n: 'Insumos' },
-  { id: 'registrar', e: '➕', n: 'Registrar' },
+  { id: 'informe', e: '🖨️', n: 'Informe' },
   { id: 'movimientos', e: '🧾', n: 'Movim.' },
-  { id: 'parametros', e: '⚙️', n: 'Ajustes' }
+  { id: 'admin', e: '🔐', n: 'Admin' }
+];
+const ADMIN_SEC = [
+  { id: 'registrar', e: '➕', n: 'Registrar' },
+  { id: 'reposicion', e: '🛒', n: 'Reposición' },
+  { id: 'conexion', e: '🔌', n: 'Conexión' }
 ];
 const PERIODOS_UI = [
   { id: 'hist', e: '📚', n: 'Histórico' },
@@ -24,11 +29,11 @@ const PERIODOS_UI = [
   { id: 'trim', e: '📊', n: 'Último trimestre' }
 ];
 const ESTADO = { ok: '🟢 Normal', warn: '🟠 Pedir', bad: '🔴 Crítico', na: '⚪ Sin datos' };
-const FRASES = ['Contando tarimas…', 'Midiendo la cisterna…', 'Pesando bobinas de stretch…', 'Apilando bolsas de cal…', 'Calculando coberturas…'];
+const FRASES = ['Conectando con la planilla…', 'Leyendo stock de tarimas y stretch…', 'Leyendo la cisterna de gasoil…', 'Calculando coberturas…', 'Preparando indicadores…'];
 const DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-const cv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const cv = n => getComputedStyle(ST.cvEl || document.documentElement).getPropertyValue(n).trim();
 const colorIns = id => cv('--c-' + id);
 const colorEst = e => cv({ ok: '--ok', warn: '--warn', bad: '--bad', na: '--muted' }[e] || '--muted');
 const alfa = (hex, a) => { const h = hex.replace('#', ''); if (h.length !== 6) return hex; return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`; };
@@ -55,6 +60,18 @@ function confirmar(texto, ico) {
 }
 
 function loader(on) { $('toploader').classList.toggle('on', !!on); }
+
+function guardando(on, txt) {
+  const o = $('overlay');
+  if (txt) $('overlayTxt').textContent = txt;
+  o.classList.toggle('on', !!on);
+  loader(on);
+}
+
+function esqueleto() {
+  app().innerHTML = `<section class="vista"><div class="hero"><div><div class="skel" style="width:180px;height:12px"></div><div class="skel" style="width:280px;height:32px;margin-top:10px"></div></div></div>
+    <div class="ins-grid">${ORDEN.map(id => `<div class="card ins-card skel-card" style="--c:var(--c-${id})"><div class="ins-cab"><span class="ins-ico">${INSUMOS[id].emoji}</span><div><h3>${INSUMOS[id].nombre}</h3><div class="sub">Cargando…</div></div></div><div class="skel" style="height:112px"></div><div class="skel" style="height:54px"></div></div>`).join('')}</div></section>`;
+}
 
 function estadoRed(tipo, txt) {
   const r = $('red');
@@ -149,24 +166,25 @@ function ilus(id, stock, x, extra) {
   let cuerpo = '';
   if (id === 'gasoil') {
     const y0 = 26, h = 62, top = y0 + h * (1 - fr);
-    const lin = f => f === null ? '' : `<line class="ref ${f === fSS ? 'ss' : 'pp'}" x1="8" x2="104" y1="${y0 + h * (1 - f)}" y2="${y0 + h * (1 - f)}"/>`;
+    const lin = (f, c) => f === null ? '' : `<line class="ref ${c}" x1="8" x2="104" y1="${y0 + h * (1 - f)}" y2="${y0 + h * (1 - f)}"/>`;
     cuerpo = `<defs><clipPath id="c${uid}"><rect x="8" y="${y0}" width="96" height="${h}" rx="31"/></clipPath></defs>
       <rect class="fondo" x="8" y="${y0}" width="96" height="${h}" rx="31"/>
       <g clip-path="url(#c${uid})"><g class="sube"><rect class="liq" x="0" y="${top}" width="112" height="${y0 + h - top}"/></g>
-      <path class="liq2 ola" d="M-10 ${top} q 10 -5 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 v 8 h -140 z"/></g>
+      <path class="liq2 ola" d="M-10 ${top} q 10 -5 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 v 8 h -140 z"/>
+      <rect class="brillo" x="20" y="${y0 + 8}" width="60" height="5" rx="2.5"/></g>
       <rect class="marco" x="8" y="${y0}" width="96" height="${h}" rx="31"/>
-      ${lin(fPP)}${lin(fSS)}
+      ${lin(fPP, 'pp')}${lin(fSS, 'ss')}
       <rect class="marco" x="48" y="17" width="16" height="9" rx="2"/>
       <line class="marco" x1="26" y1="88" x2="22" y2="100"/><line class="marco" x1="86" y1="88" x2="90" y2="100"/>
       <text x="56" y="108" text-anchor="middle">${pct} %</text>`;
   } else if (id === 'stretch') {
     const y0 = 12, h = 84, top = y0 + h * (1 - fr);
     const lin = (f, c) => f === null ? '' : `<line class="ref ${c}" x1="24" x2="88" y1="${y0 + h * (1 - f)}" y2="${y0 + h * (1 - f)}"/>`;
-    let rayas = '';
-    for (let i = 1; i < 7; i++) rayas += `<line x1="${30 + i * 7.5}" x2="${30 + i * 7.5}" y1="${y0}" y2="${y0 + h}" stroke="rgba(255,255,255,.25)" stroke-width="1"/>`;
+    let capas = '';
+    for (let yy = top + 5; yy < y0 + h; yy += 6) capas += `<line x1="30" x2="82" y1="${yy}" y2="${yy}" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
     cuerpo = `<defs><clipPath id="c${uid}"><rect x="30" y="${y0}" width="52" height="${h}" rx="10"/></clipPath></defs>
       <rect class="fondo" x="30" y="${y0}" width="52" height="${h}" rx="10"/>
-      <g clip-path="url(#c${uid})"><g class="sube"><rect class="liq" x="20" y="${top}" width="72" height="${y0 + h - top}"/></g>${rayas}</g>
+      <g clip-path="url(#c${uid})"><g class="sube"><rect class="film" x="20" y="${top}" width="72" height="${y0 + h - top}"/></g>${capas}<rect class="brillo" x="36" y="${y0}" width="7" height="${h}"/></g>
       <rect class="marco" x="30" y="${y0}" width="52" height="${h}" rx="10"/>
       <rect class="marco" x="50" y="4" width="12" height="8" rx="2"/><rect class="marco" x="50" y="96" width="12" height="8" rx="2"/>
       ${lin(fPP, 'pp')}${lin(fSS, 'ss')}
@@ -176,21 +194,22 @@ function ilus(id, stock, x, extra) {
     for (let i = 0; i < n; i++) {
       const y = 92 - i * 10.5, on = i < llenas;
       const cls = on ? 'liq' : 'vacio';
-      cuerpo += `<g class="${on ? 'aparece' : ''}" style="animation-delay:${i * 60}ms"><rect class="${cls}" x="14" y="${y}" width="84" height="4" rx="1.5"/>
-        <rect class="${cls}" x="16" y="${y + 4}" width="10" height="5" rx="1"/><rect class="${cls}" x="51" y="${y + 4}" width="10" height="5" rx="1"/><rect class="${cls}" x="86" y="${y + 4}" width="10" height="5" rx="1"/></g>`;
+      const veta = on ? `<line x1="18" x2="94" y1="${y + 2}" y2="${y + 2}" stroke="var(--c2)" stroke-width=".6" opacity=".55"/>` : '';
+      cuerpo += `<g class="${on ? 'aparece' : ''}" style="animation-delay:${i * 60}ms"><rect class="${cls}" x="14" y="${y}" width="84" height="4" rx="1.5"/>${veta}
+        <rect class="${cls}" x="16" y="${y + 4}" width="10" height="5" rx="1"/><rect class="${cls}" x="51" y="${y + 4}" width="10" height="5" rx="1"/><rect class="${cls}" x="86" y="${y + 4}" width="10" height="5" rx="1"/>${on ? `<rect class="borde" x="14" y="${y}" width="84" height="9" rx="1.5"/>` : ''}</g>`;
     }
     const ref = (f, c) => f === null ? '' : `<line class="ref ${c}" x1="6" x2="106" y1="${101 - f * n * 10.5}" y2="${101 - f * n * 10.5}"/>`;
     cuerpo += ref(fPP, 'pp') + ref(fSS, 'ss') + `<text x="56" y="110" text-anchor="middle">${pct} %</text>`;
   } else {
     const pos = [[10, 74], [42, 74], [74, 74], [26, 50], [58, 50], [10, 26], [42, 26], [74, 26], [42, 4]];
     const llenas = Math.round(fr * pos.length);
-    pos.forEach((p, i) => {
+    pos.forEach((q, i) => {
       const on = i < llenas;
-      cuerpo += `<g class="${on ? 'aparece' : ''}" style="animation-delay:${i * 60}ms"><rect class="${on ? 'liq' : 'vacio'}" x="${p[0]}" y="${p[1]}" width="28" height="21" rx="6"/>${on ? `<text x="${p[0] + 14}" y="${p[1] + 14}" text-anchor="middle" style="fill:#fff;font-size:7px">CAL</text>` : ''}</g>`;
+      cuerpo += `<g class="${on ? 'aparece' : ''}" style="animation-delay:${i * 60}ms"><rect class="${on ? 'liq' : 'vacio'}" x="${q[0]}" y="${q[1]}" width="28" height="21" rx="6"/>${on ? `<rect class="borde" x="${q[0]}" y="${q[1]}" width="28" height="21" rx="6"/><line x1="${q[0] + 4}" x2="${q[0] + 24}" y1="${q[1] + 4}" y2="${q[1] + 4}" stroke="var(--c2)" stroke-width=".8"/><text class="tx-cal" x="${q[0] + 14}" y="${q[1] + 15}" text-anchor="middle">CAL</text>` : ''}</g>`;
     });
     cuerpo += `<text x="56" y="110" text-anchor="middle">${pct} %</text>`;
   }
-  return `<svg class="ilus" viewBox="0 0 112 112" role="img" aria-label="Nivel de stock ${pct} % de la capacidad de referencia"${extra || ''}>${cuerpo}</svg>`;
+  return `<svg class="ilus" viewBox="0 0 112 112" style="--c:var(--c-${id});--c2:var(--c-${id}-2)" role="img" aria-label="Nivel de stock ${pct} % de la capacidad de referencia"${extra || ''}>${cuerpo}</svg>`;
 }
 
 function fechaLarga(iso) {
@@ -206,7 +225,7 @@ function vistaResumen() {
   const cards = ORDEN.map((id, i) => {
     const I = INSUMOS[id], x = M[id];
     const ult = (x.movs || []).filter(m => m.tipo === 'Ingreso' || m.tipo === 'Carga cisterna').slice(-1)[0];
-    return `<article class="card hover ins-card ${x.estado}" style="--c:var(--c-${id});--i:${i}" data-ir="${id}" tabindex="0">
+    return `<article class="card hover ins-card ${x.estado}" style="--c:var(--c-${id});--c2:var(--c-${id}-2);--i:${i}" data-ir="${id}" tabindex="0">
       <div class="ins-cab"><span class="ins-ico">${I.emoji}</span><div><h3>${I.nombre}</h3><div class="sub">${I.desc}</div></div><span class="tag est-tag">${ESTADO[x.estado]}</span></div>
       <div class="ins-cuerpo">${ilus(id, x.stock, x)}
         <div class="ins-num"><div class="v">${fmt(x.stock)}<small>${I.u}</small></div>
@@ -263,7 +282,7 @@ function vistaResumen() {
 function sparkline(id) {
   const x = ST.modelo[id];
   const s = x.serie.filter(r => r.stock !== null && r.stock !== undefined).slice(-60);
-  const c = colorEst(x.estado);
+  const c = colorIns(id);
   grafico('sp-' + id, {
     type: 'line',
     data: { labels: s.map(r => fFecha(r.f)), datasets: [
@@ -324,7 +343,8 @@ function vistaInsumo(id) {
   const ks = [
     kpiHtml('📉', 'Consumo diario', fmt(k.lDia, dec), u + '/día', cmp || 'Consumo ÷ días calendario'),
     kpiHtml('🏭', 'Por día operativo', fmt(k.lDiaOp, dec), u + '/día', `${fmt(k.diasConsumo)} días con consumo`),
-    kpiHtml('🔥', 'Consumo total', fmt(k.cons), u, `P90 ${fmt(k.p90, dec)} · pico ${fmt(k.pico, dec)}`),
+    kpiHtml('🔥', 'Consumo total', fmt(k.cons), u, `P90 ${fmt(k.p90, dec)} · pico ${fmt(k.pico, dec)} (${fFecha(k.fechaPico)})`),
+    kpiHtml('📆', 'Hábil / fin de semana', `${fmt(k.lHabil, dec)} / ${fmt(k.lFinde, dec)}`, u + '/día', `${fmt(k.diasSin)} días sin consumo · CV ${fmt(k.cv, 2)}`),
     kpiHtml('📥', 'Ingresos', fmt(k.ingTotal), u, `${fmt(k.entregas)} entregas · ${fmt(k.entregaProm, dec)} por entrega`),
     kpiHtml('📦', 'Stock promedio', fmt(k.stockProm), u, `Mínimo ${fmt(k.stockMin)} ${u}`),
     kpiHtml('⏳', 'Cobertura promedio', fmt(k.coberturaProm, 1), 'días', `Rotación ${fmt(k.rotacion, 1)} veces`),
@@ -343,7 +363,7 @@ function vistaInsumo(id) {
     kpiHtml('❓', 'Pallets sin stretch', fmt(k.diasSinConsumoCargado), 'días', 'Revisar la carga de consumo', k.diasSinConsumoCargado ? 'warn' : ''));
   if (id === 'gasoil') ks.push(
     kpiHtml('🚜', 'Despachos', fmt(k.despachos), '', `${fmt(k.lDespacho, 1)} L por despacho`),
-    kpiHtml('🚛', 'Unidades con consumo', fmt(k.unidades), '', ''),
+    kpiHtml('🚛', 'Unidades con consumo', fmt(k.unidades), '', `Top 3 unidades: ${pct(k.top3)} del consumo`),
     kpiHtml('🌙', 'Cargado 22–6 h', pct(k.nocturno), '', 'Control de despachos nocturnos'),
     kpiHtml('🧭', 'Sin odómetro válido', pct(k.sinOdo), '', 'Vacío, 0, 9999 o 99999', (k.sinOdo || 0) > 10 ? 'warn' : ''),
     kpiHtml('📏', 'Sonda vs. teórico', fmt(k.difSonda), 'L', `Promedio de ${fmt(k.mediciones)} mediciones`));
@@ -398,6 +418,7 @@ function vistaInsumo(id) {
   if (id === 'stretch') espStretch(p);
   if (id === 'gasoil') espGasoil(p, P);
   if (id === 'cal') espCal(p);
+  if (id !== 'gasoil') $('esp').insertAdjacentHTML('beforeend', cardHtml('📋 Comparativa de períodos', 'Histórico, últimos 365 días, año en curso contra el anterior y trimestres', tablaComparativa(id)));
 }
 
 function tablaProveedores(movs, u, dec, conBob) {
@@ -472,26 +493,53 @@ function espCal(p) {
   });
 }
 
-function espGasoil(p, P) {
+const EM_DEP = { 'Máquinas cargadoras': '🚜', 'Camiones': '🚛', 'Autoelevadores': '🏗️', 'Camionetas': '🛻', 'Generador': '⚡', 'Mantenimiento': '🔧', 'Otros': '❔', 'Sin identificar (#)': '❔' };
+const vtxt = v => v === null || v === undefined ? '—' : v > 999 ? '> +999 %' : delta(v);
+
+function tablaComparativa(id) {
+  const I = INSUMOS[id], x = ST.modelo[id], dec = I.dec;
+  const P = periodos(ST.modelo.fin, x.inicio);
+  const cols = [['hist', 'Histórico'], ['u365', 'Últ. 365 d'], ['ytd_ant', P.ytd_ant.a.slice(0, 4) + '*'], ['ytd', P.ytd.a.slice(0, 4) + '*'], ['trim_yoy', P.trim_yoy.nombre], ['trim_ant', P.trim_ant.nombre], ['trim', P.trim.nombre]];
+  const K = {};
+  cols.forEach(([c]) => { K[c] = kpis(id, P[c]); });
+  const filas = [
+    ['Días del período', 'dias', 0], [`Consumo [${I.u}/día]`, 'lDia', dec], [`Consumo total [${I.u}]`, 'cons', 0], ['Ingresos [' + I.u + ']', 'ingTotal', 0],
+    [`P90 diario [${I.u}]`, 'p90', 0], [`Día pico [${I.u}]`, 'pico', 0], [`Día hábil [${I.u}/día]`, 'lHabil', 0], [`Fin de semana [${I.u}/día]`, 'lFinde', 0],
+    ['Días sin consumo', 'diasSin', 0], ['Variabilidad diaria (CV)', 'cv', 2], ['Stock promedio', 'stockProm', 0], ['Cobertura promedio [días]', 'coberturaProm', 1]
+  ];
+  if (id === 'gasoil') filas.push(['Despachos', 'despachos', 0], ['Litros por despacho', 'lDespacho', 1], ['Unidades con consumo', 'unidades', 0], ['Top 3 unidades [%]', 'top3', 1], ['Cargado 22–6 h [%]', 'nocturno', 1], ['Sin odómetro válido [%]', 'sinOdo', 1]);
+  if (id === 'tarimas') filas.push(['Descarte [u]', 'descarte', 0], ['Descarte [%]', 'descartePct', 1]);
+  if (id === 'stretch') filas.push(['Stretch por pallet [g]', 'grPallet', 0]);
+  return `<div class="tw"><table class="comp"><thead><tr><th>Indicador</th>${cols.map(c => `<th class="n">${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${filas.map(f => `<tr><td>${f[0]}</td>${cols.map(c => `<td class="n">${fmt(K[c[0]][f[1]], f[2])}</td>`).join('')}</tr>`).join('')}
+    <tr class="total"><td>Variación del consumo diario</td>${cols.map(c => { const p = P[c[0]]; const d = p.cmp ? compara(K[c[0]], K[p.cmp]) : null; return `<td class="n"><span class="${dClase(d)}">${d === null ? '' : delta(d)}</span></td>`; }).join('')}</tr></tbody></table></div>
+    <p class="nota">* Mismo tramo del año: del 01/01 al ${fFecha(P.ytd.b).slice(0, 5)}. La variación del año en curso se compara con el año anterior y la del último trimestre con el mismo trimestre del año anterior.</p>`;
+}
+
+function tablaUnidadesGasoil(p, P, opciones) {
+  const o = opciones || {};
+  const U = gasoilUnidades(p, P);
+  const conC = !!p.cmp;
+  const deps = {};
+  U.forEach(r => { (deps[r.d] = deps[r.d] || []).push(r); });
+  const orden = Object.entries(deps).sort((a, b) => sumar(b[1], 'l') - sumar(a[1], 'l'));
+  const max = Math.max.apply(null, U.map(r => r.lDia).concat([1]));
+  const nc = conC ? 11 : 9;
+  const lista = o.top ? orden.map(([d, rs]) => [d, rs.slice(0, o.top)]) : orden;
+  return `<div class="tw${o.top ? '' : ' max'}"><table><thead><tr><th>Unidad</th><th class="n">L/día</th><th class="n" title="Litros ÷ días desde la primera carga de la unidad">L/día activo</th><th class="n">Litros</th><th class="n">Part.</th><th class="n">Despachos</th><th class="n">L/despacho</th><th class="n">Días entre cargas</th><th class="n">L/h · km/L</th>${conC ? '<th class="n">L/día comp.</th><th class="n">Var.</th>' : ''}</tr></thead><tbody>` +
+    lista.map(([d, rs]) => `<tr class="grupo"><td colspan="${nc}">${EM_DEP[d] || '🚗'} ${esc(d)} · ${fmt(sumar(rs, 'lDia'), 1)} L/día</td></tr>` + rs.map(r => `<tr><td>${esc(r.u)}</td><td class="n">${fmt(r.lDia, 1)}<span class="minibar"><span style="width:${100 * r.lDia / max}%"></span></span></td><td class="n${r.diasAct < 30 ? ' tenue' : ''}">${fmt(r.lDiaAct, 1)}</td><td class="n">${fmt(r.l)}</td><td class="n">${pct(r.part)}</td><td class="n">${fmt(r.n)}</td><td class="n">${fmt(r.lDesp, 1)}</td><td class="n">${fmt(r.intervalo, 1)}</td><td class="n">${r.lh ? fmt(r.lh, 2) + ' L/h' : r.kml ? fmt(r.kml, 2) + ' km/L' : '—'}</td>${conC ? `<td class="n">${r.nueva ? '—' : fmt(r.lDiaCmp, 1)}</td><td class="n"><span class="${dClase(r.delta)}">${r.nueva ? '🆕 Nueva' : vtxt(r.delta)}</span></td>` : ''}</tr>`).join('')).join('') + '</tbody></table></div>';
+}
+
+function tablaDeptosGasoil(p, P) {
   const G = agruparGasoil(p, P);
   const conC = !!G.c;
   const dv = (l, lc) => conC ? (lc ? 100 * (l / G.dias - lc / G.diasC) / (lc / G.diasC) : null) : null;
-  const vtxt = v => v === null ? '—' : v > 999 ? '> +999 %' : delta(v);
-  const EM = { 'Máquinas cargadoras': '🚜', 'Camiones': '🚛', 'Autoelevadores': '🏗️', 'Camionetas': '🛻', 'Generador': '⚡', 'Mantenimiento': '🔧', 'Otros': '❔' };
   const deps = Object.entries(G.dep).sort((a, b) => b[1].l - a[1].l);
-  const tDep = `<div class="tw"><table><thead><tr><th>Departamento</th><th class="n">Unid.</th><th class="n">Litros</th><th class="n">L/día</th><th class="n">Part.</th>${conC ? '<th class="n">L/día comp.</th><th class="n">Var.</th>' : ''}</tr></thead><tbody>` +
-    deps.map(([d, x]) => { const v = dv(x.l, G.depC[d]); return `<tr><td>${EM[d] || '🚗'} ${esc(d)}</td><td class="n">${x.u.size}</td><td class="n">${fmt(x.l)}</td><td class="n">${fmt(x.l / G.dias, 1)}</td><td class="n">${pct(100 * x.l / G.tot)}</td>${conC ? `<td class="n">${G.depC[d] ? fmt(G.depC[d] / G.diasC, 1) : '—'}</td><td class="n"><span class="${dClase(v)}">${G.depC[d] ? vtxt(v) : '🆕 Nuevo'}</span></td>` : ''}</tr>`; }).join('') + '</tbody></table></div>';
-  const max = Math.max.apply(null, Object.values(G.uni).map(x => x.l).concat([1]));
-  const tUni = `<div class="tw max"><table><thead><tr><th>Unidad</th><th class="n">L/día</th><th class="n">Litros</th><th class="n">Part.</th><th class="n">Despachos</th><th class="n">L/despacho</th>${conC ? '<th class="n">L/día comp.</th><th class="n">Var.</th>' : ''}</tr></thead><tbody>` +
-    deps.map(([d]) => `<tr class="grupo"><td colspan="${conC ? 8 : 6}">${EM[d] || '🚗'} ${esc(d)}</td></tr>` + Object.entries(G.uni).filter(e => e[1].d === d).sort((a, b) => b[1].l - a[1].l).map(([un, x]) => {
-      const v = dv(x.l, G.uniC[un]);
-      return `<tr><td>${esc(un)}</td><td class="n">${fmt(x.l / G.dias, 1)}<span class="minibar"><span style="width:${100 * x.l / max}%"></span></span></td><td class="n">${fmt(x.l)}</td><td class="n">${pct(100 * x.l / G.tot)}</td><td class="n">${fmt(x.n)}</td><td class="n">${fmt(x.l / x.n, 1)}</td>${conC ? `<td class="n">${G.uniC[un] ? fmt(G.uniC[un] / G.diasC, 1) : '—'}</td><td class="n"><span class="${dClase(v)}">${G.uniC[un] ? vtxt(v) : '🆕 Nueva'}</span></td>` : ''}</tr>`;
-    }).join('')).join('') + '</tbody></table></div>';
-  const cargas = movsPeriodo(ST.modelo.gasoil, p).filter(m => m.tipo === 'Carga cisterna');
-  const tCargas = cargas.length ? `<div class="mov-lista">${cargas.slice().reverse().slice(0, 8).map(m => `<div class="mov"><span class="e">🛢️</span><div class="t"><b>${fFecha(m.f)}</b><div class="sub">${esc(m.obs || 'Carga de cisterna')}</div></div><div class="q">${fmt(m.cant)} L</div></div>`).join('')}</div><p class="nota">${cargas.length} cargas · ${fmt(sumar(cargas, 'cant'))} L · ${fmt(sumar(cargas, 'cant') / cargas.length)} L por carga</p>` : '<div class="empty">📭 Sin cargas en el período (el registro empieza en 2026)</div>';
-  $('esp').innerHTML = `<div class="grid g-21">${cardHtml('🏢 Consumo por departamento', 'Período elegido', tDep)}${cardHtml('🛢️ Cargas de cisterna', 'Período elegido', tCargas)}</div>` +
-    cardHtml('📊 Consumo diario por departamento y mes', 'L/día', '<div class="chart lg"><canvas id="chE1"></canvas></div>') +
-    cardHtml('🚛 Consumo diario promedio por unidad', 'Agrupado por departamento', tUni);
+  return `<div class="tw"><table><thead><tr><th>Departamento</th><th class="n">Unid.</th><th class="n">Litros</th><th class="n">L/día</th><th class="n">Part.</th>${conC ? '<th class="n">L/día comp.</th><th class="n">Var.</th>' : ''}</tr></thead><tbody>` +
+    deps.map(([d, x]) => { const v = dv(x.l, G.depC[d]); return `<tr><td>${EM_DEP[d] || '🚗'} ${esc(d)}</td><td class="n">${x.u.size}</td><td class="n">${fmt(x.l)}</td><td class="n">${fmt(x.l / G.dias, 1)}</td><td class="n">${pct(100 * x.l / G.tot)}</td>${conC ? `<td class="n">${G.depC[d] ? fmt(G.depC[d] / G.diasC, 1) : '—'}</td><td class="n"><span class="${dClase(v)}">${G.depC[d] ? vtxt(v) : '🆕 Nuevo'}</span></td>` : ''}</tr>`; }).join('') +
+    `<tr class="total"><td>Total planta</td><td class="n">${fmt(sumar(deps.map(d => d[1].u.size)))}</td><td class="n">${fmt(G.tot)}</td><td class="n">${fmt(G.tot / G.dias, 1)}</td><td class="n">100,0 %</td>${conC ? '<td></td><td></td>' : ''}</tr></tbody></table></div>`;
+}
+
+function datosMensualGasoil() {
   const x = ST.modelo.gasoil, fin = ST.modelo.fin;
   const totD = {};
   x.tx.forEach(t => { totD[t.d] = (totD[t.d] || 0) + t.l; });
@@ -501,11 +549,28 @@ function espGasoil(p, P) {
   x.serie.filter(r => r.f <= fin).forEach(r => { const m = r.f.slice(0, 7); dias[m] = (dias[m] || 0) + 1; });
   x.tx.filter(t => t.f <= fin).forEach(t => { const m = t.f.slice(0, 7), s = top.includes(t.d) ? t.d : 'Resto'; g[m + '|' + s] = (g[m + '|' + s] || 0) + t.l; });
   const ms = Object.keys(dias).sort();
-  grafico('chE1', {
+  return { ms, series, val: (m, s) => (g[m + '|' + s] || 0) / dias[m] };
+}
+
+function graficoDeptosMes(idCanvas, animar) {
+  const D = datosMensualGasoil();
+  grafico(idCanvas, {
     type: 'bar',
-    data: { labels: ms.map(fMes), datasets: series.map((s, i) => ({ label: s, data: ms.map(m => (g[m + '|' + s] || 0) / dias[m]), backgroundColor: cv(PALETA[i]), borderRadius: 3 })) },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y, 1) + ' L/día' } } }, scales: { x: Object.assign(ejeX(), { stacked: true }), y: Object.assign(ejeY(0), { stacked: true }) } }
+    data: { labels: D.ms.map(fMes), datasets: D.series.map((s, i) => ({ label: s, data: D.ms.map(m => D.val(m, s)), backgroundColor: cv(PALETA[i]), borderRadius: 3 })) },
+    options: { animation: animar === false ? false : undefined, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: animar === false ? { font: { size: 9 }, boxHeight: 6, padding: 6 } : {} }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt(c.parsed.y, 1) + ' L/día' } } }, scales: { x: Object.assign(ejeX(), { stacked: true }, animar === false ? { ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } } : {}), y: Object.assign(ejeY(0), { stacked: true }, animar === false ? { ticks: { font: { size: 9 }, callback: v => fmt(v) } } : {}) } }
   });
+}
+
+function espGasoil(p, P) {
+  const cargas = movsPeriodo(ST.modelo.gasoil, p).filter(m => m.tipo === 'Carga cisterna');
+  const tCargas = cargas.length ? `<div class="mov-lista">${cargas.slice().reverse().slice(0, 8).map(m => `<div class="mov"><span class="e">🛢️</span><div class="t"><b>${fFecha(m.f)}</b><div class="sub">${esc(m.obs || 'Carga de cisterna')}</div></div><div class="q">${fmt(m.cant)} L</div></div>`).join('')}</div><p class="nota">${cargas.length} cargas · ${fmt(sumar(cargas, 'cant'))} L · ${fmt(sumar(cargas, 'cant') / cargas.length)} L por carga</p>` : '<div class="empty">📭 Sin cargas en el período (el registro empieza en 2026)</div>';
+  const ops = gasoilOperadores(p);
+  const tOps = `<div class="tw"><table><thead><tr><th>Operador</th><th class="n">Despachos</th><th class="n">Litros</th><th class="n">Part.</th></tr></thead><tbody>${ops.map(o => `<tr><td>👷 ${esc(o.op)}</td><td class="n">${fmt(o.n)}</td><td class="n">${fmt(o.l)}</td><td class="n">${pct(o.part)}</td></tr>`).join('')}</tbody></table></div>`;
+  $('esp').innerHTML = `<div class="grid g-21">${cardHtml('🏢 Consumo por departamento', 'Cada unidad cuenta en el departamento de su último registro', tablaDeptosGasoil(p, P))}${cardHtml('🛢️ Cargas de cisterna', 'Período elegido', tCargas)}</div>` +
+    cardHtml('🚛 Consumo diario promedio por unidad', 'L/día = litros ÷ días calendario · L/día activo = litros ÷ días desde la primera carga (gris si son menos de 30) · L/h y km/L estimados con horómetro u odómetro', tablaUnidadesGasoil(p, P)) +
+    `<div class="grid g2">${cardHtml('📊 Consumo diario por departamento y mes', 'L/día', '<div class="chart lg"><canvas id="chE1"></canvas></div>')}${cardHtml('👷 Despachos por operador', 'Período elegido', tOps)}</div>` +
+    cardHtml('📋 Comparativa de períodos', 'Histórico, últimos 365 días, año en curso contra el anterior y trimestres', tablaComparativa('gasoil'));
+  graficoDeptosMes('chE1');
 }
 
 function campoHtml(c, op, ins) {
@@ -537,9 +602,7 @@ function vistaRegistrar() {
   if (!ops.find(o => o.id === ST.regOp)) ST.regOp = ops[0].id;
   const op = ops.find(o => o.id === ST.regOp);
   const M = ST.modelo;
-  app().innerHTML = `<section class="vista">
-    <div class="hero"><div><div class="eyebrow">Carga de datos</div><h1>Registrar <span>movimiento</span></h1><p class="sub">Se escribe directo en las planillas de la planta.</p></div></div>
-    <div class="grid g-21">
+  $('adm').innerHTML = `<div class="grid g-21">
       <div class="card">
         <div class="paso"><span class="nro">1</span><h3>¿Qué insumo?</h3></div>
         <div class="tiles grandes" id="tIns">${ORDEN.map(i => `<button type="button" class="tile ${i === ins ? 'on' : ''}" data-ins="${i}"><span class="e">${INSUMOS[i].emoji}</span><span><b>${INSUMOS[i].nombre}</b><br><small>${M ? fmt(M[i].stock) + ' ' + INSUMOS[i].u : ''}</small></span></button>`).join('')}</div>
@@ -548,18 +611,17 @@ function vistaRegistrar() {
         <div class="paso" style="margin-top:18px"><span class="nro">3</span><h3>Datos</h3></div>
         <div class="ayuda-op"><span>💡</span><span>${esc(op.ayuda || '')}</span></div>
         <form id="formReg" autocomplete="off">
-          <div class="form">${op.campos.map(c => campoHtml(c, op, ins)).join('')}<label class="f">👤 Registrado por<input id="fUsuario" type="text" maxlength="60" placeholder="Nombre y apellido" required value="${esc(LS.get('ic_usuario', ''))}"></label></div>
+          <div class="form">${op.campos.map(c => campoHtml(c, op, ins)).join('')}</div>
           <div class="vista-previa vacia" id="prev">👀 Completá los datos para ver cómo queda el stock</div>
           <div class="acciones"><button class="btn" type="reset">🧹 Limpiar</button><button class="btn pri brillo" type="submit" id="btnGuardar">💾 Guardar</button></div>
         </form>
       </div>
       <div class="card"><div class="card-h"><div class="t"><h3>${INSUMOS[ins].emoji} Últimos registros</h3><span class="sub">${INSUMOS[ins].nombre}</span></div></div><div class="mov-lista">${filasMov(listaMovimientos(ins).slice(0, 12), false)}</div></div>
-    </div></section>`;
+    </div>`;
   $('tIns').querySelectorAll('[data-ins]').forEach(b => { b.onclick = () => { ST.regIns = b.dataset.ins; ST.regOp = null; vistaRegistrar(); }; });
   $('tOps').querySelectorAll('[data-op]').forEach(b => { b.onclick = () => { ST.regOp = b.dataset.op; vistaRegistrar(); }; });
   const f = $('formReg');
   f.oninput = () => vistaPrevia(ins, op);
-  $('fUsuario').addEventListener('input', e => LS.set('ic_usuario', e.target.value.trim()));
   f.onreset = () => setTimeout(() => vistaPrevia(ins, op), 0);
   f.onsubmit = e => enviar(e, ins, op);
 }
@@ -620,14 +682,12 @@ function vistaPrevia(ins, op) {
 async function enviar(e, ins, op) {
   e.preventDefault();
   const fd = new FormData($('formReg'));
-  const usuario = $('fUsuario').value.trim();
-  LS.set('ic_usuario', usuario);
-  const p = { accion: op.id, insumo: ins, usuario };
+  const p = { accion: op.id, insumo: ins };
   op.campos.forEach(c => { if (c === 'sobrescribir') p.sobrescribir = fd.get('sobrescribir') === 'on'; else if (c === 'provTexto') p.proveedor = fd.get('proveedor'); else p[c] = fd.get(c); });
   const b = $('btnGuardar');
   b.disabled = true;
   b.textContent = '⏳ Guardando…';
-  loader(true);
+  guardando(true, 'Guardando en la planilla…');
   try {
     const msg = await apiPost(p);
     toast(msg || 'Registrado', 'ok');
@@ -636,7 +696,7 @@ async function enviar(e, ins, op) {
     toast(err.message, 'bad');
     b.disabled = false;
     b.textContent = '💾 Guardar';
-  } finally { loader(false); }
+  } finally { guardando(false); }
 }
 
 function filasMov(l, conAnular) {
@@ -668,39 +728,33 @@ function filtrarMov() {
   if (fl.hasta) l = l.filter(m => m.f <= fl.hasta);
   if (fl.q) { const q = fl.q.toLowerCase(); l = l.filter(m => [m.tipo, m.prov, m.remito, m.obs, m.det].join(' ').toLowerCase().includes(q)); }
   const total = l.length;
-  $('listaMov').innerHTML = filasMov(l.slice(0, 200), true);
-  $('movNota').textContent = total > 200 ? `Se muestran 200 de ${total} registros. Filtrá por fecha para ver el resto.` : `${total} registros. Los controles físicos e inventarios se corrigen desde la planilla.`;
+  $('listaMov').innerHTML = filasMov(l.slice(0, 200), esAdmin());
+  $('movNota').textContent = total > 200 ? `Se muestran 200 de ${total} registros. Filtrá por fecha para ver el resto.` : `${total} registros.${esAdmin() ? ' Los controles físicos e inventarios se corrigen desde la planilla.' : ' Para anular registros ingresá como administrador.'}`;
   $('listaMov').querySelectorAll('[data-anular]').forEach(b => {
     b.onclick = async () => {
       const [hoja, fila, f, q] = b.dataset.anular.split('|');
       if (!(await confirmar(`¿Anular el registro del ${fFecha(f)} (${fmt(+q, 1)})? Se elimina la fila ${fila} de la planilla.`))) return;
-      loader(true);
-      try { toast(await apiPost({ accion: 'anular', hoja, fila: +fila, fecha: f, cantidad: +q, usuario: LS.get('ic_usuario', '') }), 'ok'); await cargar(true); }
+      guardando(true, 'Anulando registro…');
+      try { toast(await apiPost({ accion: 'anular', hoja, fila: +fila, fecha: f, cantidad: +q }), 'ok'); await cargar(true); }
       catch (err) { toast(err.message, 'bad'); }
-      finally { loader(false); }
+      finally { guardando(false); }
     };
   });
 }
 
-function vistaParametros() {
+function vistaReposicion() {
   const M = ST.modelo;
-  const c = conexion();
-  app().innerHTML = `<section class="vista">
-    <div class="hero"><div><div class="eyebrow">Configuración</div><h1>Ajustes de <span>reposición</span></h1><p class="sub">Stock de seguridad = días SS × consumo medio · Punto de pedido = días PP × consumo medio. Se guardan en la hoja «Necesidades».</p></div></div>
+  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Stock de seguridad = días SS × consumo medio · Punto de pedido = días PP × consumo medio. Se guardan en la hoja «Necesidades».</p>
     <div class="param-grid stagger">${ORDEN.map((id, i) => {
       const x = M[id], I = INSUMOS[id];
-      return `<div class="card param" style="--c:var(--c-${id});--i:${i}" data-id="${id}">
+      return `<div class="card param" style="--c:var(--c-${id});--c2:var(--c-${id}-2);--i:${i}" data-id="${id}">
         <div class="ins-cab"><span class="ins-ico">${I.emoji}</span><div><h3>${I.nombre}</h3><div class="sub">Consumo medio ${fmt(x.medio, I.dec)} ${I.u}/día</div></div>${x.paramGuardado ? '' : '<span class="tag t-mut">por defecto</span>'}</div>
         ${['SS', 'PP'].map(k => `<div class="stepper-fila"><div class="l">${k === 'SS' ? '🛡️ Stock de seguridad' : '🛒 Punto de pedido'}<small>días de consumo</small></div>
           <div class="stepper"><button type="button" data-paso="-1" data-k="${k}">−</button><input type="number" min="1" step="1" value="${k === 'SS' ? x.diasSS : x.diasPP}" data-k="${k}"><button type="button" data-paso="1" data-k="${k}">+</button></div></div>`).join('')}
         <div class="calc"><div><span>SS</span><b data-o="SS">${fmt(x.ss)}</b></div><div><span>PP</span><b data-o="PP">${fmt(x.pp)}</b></div><div><span>Stock</span><b>${fmt(x.stock)}</b></div></div>
         <button class="btn pri" data-guardar="${id}">💾 Guardar</button></div>`;
-    }).join('')}</div>
-    <div class="card" style="margin-top:16px"><div class="card-h"><div class="t"><h3>🔌 Conexión</h3><span class="sub">URL de la aplicación web de Apps Script y clave de acceso (se guardan solo en este navegador)</span></div></div>
-      <form class="form" id="formCx" autocomplete="off"><label class="f w2">URL /exec<input id="cUrl" type="url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="f">Clave<input id="cKey" type="password" value="${esc(c.key || '')}" placeholder="Opcional"></label>
-      <div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">🔌 Guardar y probar</button></div></form></div>
-  </section>`;
-  app().querySelectorAll('.param').forEach(card => {
+    }).join('')}</div>`;
+  $('adm').querySelectorAll('.param').forEach(card => {
     const id = card.dataset.id, x = M[id];
     const recalc = () => {
       ['SS', 'PP'].forEach(k => { const v = +card.querySelector(`input[data-k="${k}"]`).value; card.querySelector(`[data-o="${k}"]`).textContent = x.medio ? fmt(Math.ceil(v * x.medio)) : '—'; });
@@ -710,13 +764,22 @@ function vistaParametros() {
     card.querySelector('[data-guardar]').onclick = async ev => {
       const b = ev.currentTarget;
       b.disabled = true;
-      loader(true);
+      guardando(true, 'Guardando parámetros…');
       try {
-        toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +card.querySelector('input[data-k="SS"]').value, diasPP: +card.querySelector('input[data-k="PP"]').value, usuario: LS.get('ic_usuario', '') }), 'ok');
+        toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +card.querySelector('input[data-k="SS"]').value, diasPP: +card.querySelector('input[data-k="PP"]').value }), 'ok');
         await cargar(true);
-      } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { loader(false); }
+      } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
     };
   });
+}
+
+function vistaConexion() {
+  const c = conexion();
+  $('adm').innerHTML = `<div class="card"><div class="card-h"><div class="t"><h3>🔌 Conexión con la planilla</h3><span class="sub">URL de la aplicación web de Apps Script y clave de lectura. Se guardan solo en este navegador; la URL por defecto está en config.js.</span></div></div>
+    <form class="form" id="formCx" autocomplete="off"><label class="f w2">URL /exec<input id="cUrl" type="url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="f">Clave de lectura<input id="cKey" type="password" value="${esc(c.key || '')}" placeholder="Opcional"></label>
+    <div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">🔌 Guardar y probar</button></div></form></div>
+    <div class="card"><div class="card-h"><div class="t"><h3>👤 Sesión</h3><span class="sub">Ingresaste como <b>${esc((sesion() || {}).usuario || '')}</b>. La sesión vence a las ${sesion() ? new Date(sesion().vence).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}.</span></div></div>
+    <button class="btn dan" id="btnSalir2">🚪 Cerrar sesión</button></div>`;
   $('formCx').onsubmit = async e => {
     e.preventDefault();
     LS.set('ic_url', $('cUrl').value.trim());
@@ -724,6 +787,160 @@ function vistaParametros() {
     await cargar(true);
     if (ST.datos) toast('Conexión correcta', 'ok');
   };
+  $('btnSalir2').onclick = salir;
+}
+
+function vistaLogin() {
+  app().innerHTML = `<section class="vista login-wrap">
+    <div class="card login">
+      <span class="logo-tile"><img src="img/logo-cmp.png" alt=""></span>
+      <div class="eyebrow">Acceso restringido</div>
+      <h2>🔐 Administración</h2>
+      <p class="sub">Registrar movimientos, anular registros y cambiar parámetros requiere la clave de administrador.</p>
+      <form id="formLogin" class="login-form" autocomplete="on">
+        <label class="f">👤 Nombre y apellido<input id="lUsuario" type="text" maxlength="60" required autocomplete="name" value="${esc(LS.get('ic_usuario', ''))}"></label>
+        <label class="f">🔑 Clave<input id="lClave" type="password" required autocomplete="current-password"></label>
+        <button class="btn pri brillo" type="submit" id="btnLogin">Ingresar</button>
+      </form>
+    </div></section>`;
+  $('formLogin').onsubmit = async e => {
+    e.preventDefault();
+    const b = $('btnLogin');
+    b.disabled = true;
+    b.innerHTML = '<span class="spin"></span> Verificando…';
+    try {
+      const usuario = $('lUsuario').value.trim();
+      const r = await apiPost({ accion: 'login', usuario, clave: $('lClave').value });
+      LS.set('ic_usuario', usuario);
+      LS.set('ic_ses', { token: r.token, usuario: r.usuario, vence: r.vence });
+      toast('Bienvenido/a, ' + r.usuario, 'ok');
+      pintarSesion();
+      render();
+    } catch (err) {
+      toast(err.message, 'bad');
+      $('lClave').classList.add('inv');
+      b.disabled = false;
+      b.textContent = 'Ingresar';
+    }
+  };
+}
+
+function vistaAdmin() {
+  if (!esAdmin()) { vistaLogin(); return; }
+  if (!ADMIN_SEC.find(x => x.id === ST.admSec)) ST.admSec = 'registrar';
+  app().innerHTML = `<section class="vista">
+    <div class="hero"><div><div class="eyebrow">👤 ${esc(sesion().usuario)} · Administrador</div><h1>Admini<span>stración</span></h1><p class="sub">Todo lo que modifica las planillas está acá.</p></div>
+      <div class="seg" id="segAdm">${ADMIN_SEC.map(x => `<button data-sec="${x.id}" class="${x.id === ST.admSec ? 'on' : ''}"><span>${x.e}</span>${x.n}</button>`).join('')}</div></div>
+    <div id="adm"></div></section>`;
+  $('segAdm').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.admSec = b.dataset.sec; vistaAdmin(); }; });
+  requestAnimationFrame(() => moverPill($('segAdm')));
+  if (ST.admSec === 'registrar') vistaRegistrar();
+  else if (ST.admSec === 'reposicion') vistaReposicion();
+  else vistaConexion();
+}
+
+async function salir() {
+  const s = sesion();
+  LS.set('ic_ses', null);
+  pintarSesion();
+  render();
+  toast('Sesión cerrada', 'ok');
+  if (s) { try { await apiPost({ accion: 'logout', token: s.token }); } catch (e) {} }
+}
+
+function pintarSesion() {
+  const s = sesion();
+  const b = $('btnSesion');
+  b.innerHTML = s ? `👤 <span>${esc(s.usuario.split(' ')[0])}</span>` : '🔐 <span>Ingresar</span>';
+  b.title = s ? 'Sesión de administrador · clic para salir' : 'Ingresar como administrador';
+  b.classList.toggle('pri', !s);
+}
+
+const PER_INF = [
+  { id: 'u30', e: '🗓️', n: 'Últimos 30 días' },
+  { id: 'trim', e: '📊', n: 'Último trimestre' },
+  { id: 'ytd', e: '📅', n: 'Año en curso' },
+  { id: 'u365', e: '📆', n: 'Últimos 365 días' }
+];
+
+function periodoInforme(id, pid) {
+  const P = periodos(ST.modelo.fin, ST.modelo[id].inicio);
+  const p = Object.assign({}, P[pid]);
+  if (pid === 'u30') { p.cmp = 'p30'; p.nombre = 'Últimos 30 días'; }
+  return { P, p };
+}
+
+function vistaInforme() {
+  const M = ST.modelo;
+  if (!PER_INF.find(x => x.id === ST.perInf)) ST.perInf = 'u30';
+  const pid = ST.perInf;
+  const base = periodoInforme('gasoil', pid);
+  const p0 = base.p;
+  const ses = sesion();
+  const ahora = new Date();
+  const filas = ORDEN.map(id => {
+    const { P, p } = periodoInforme(id, pid);
+    const k = kpis(id, p), kc = p.cmp ? kpis(id, P[p.cmp]) : null, d = compara(k, kc);
+    return { id, k, d, cmpNom: p.cmp ? P[p.cmp].nombre : '' };
+  });
+  const tarjetas = ORDEN.map(id => {
+    const x = M[id], I = INSUMOS[id];
+    return `<div class="inf-est ${x.estado}" style="--c:var(--c-${id});--c2:var(--c-${id}-2)">${ilus(id, x.stock, x)}<div><div class="inf-nom">${I.emoji} ${I.nombre}</div><div class="inf-stock">${fmt(x.stock)} <small>${I.u}</small></div><div class="inf-cob">⏳ ${fmt(x.cobertura, 1)} días · <span class="est-tag tag">${ESTADO[x.estado]}</span></div><div class="inf-pp">PP ${fmt(x.pp)} · SS ${fmt(x.ss)} ${I.u}</div></div></div>`;
+  }).join('');
+  const tabla = `<table class="inf-tabla"><thead><tr><th>Insumo</th><th class="n">Consumo/día</th><th class="n">Variación</th><th class="n">Consumo total</th><th class="n">Ingresos</th><th class="n">Stock promedio</th><th class="n">Cobertura prom.</th><th class="n">Días bajo SS</th></tr></thead><tbody>${filas.map(f => { const I = INSUMOS[f.id]; return `<tr><td>${I.emoji} ${I.nombre}</td><td class="n"><b>${fmt(f.k.lDia, I.dec)}</b> ${I.u}</td><td class="n"><span class="${dClase(f.d)}">${delta(f.d)}</span></td><td class="n">${fmt(f.k.cons)} ${I.u}</td><td class="n">${fmt(f.k.ingTotal)} ${I.u}</td><td class="n">${fmt(f.k.stockProm)} ${I.u}</td><td class="n">${fmt(f.k.coberturaProm, 1)} d</td><td class="n">${fmt(f.k.diasBajoSS)}</td></tr>`; }).join('')}</tbody></table>`;
+  const claves = id => {
+    const k = filas.find(f => f.id === id).k, I = INSUMOS[id];
+    const l = [['Consumo diario', fmt(k.lDia, I.dec) + ' ' + I.u], ['Hábil / fin de semana', fmt(k.lHabil, 0) + ' / ' + fmt(k.lFinde, 0)], ['Día pico', fmt(k.pico) + ' (' + fFecha(k.fechaPico).slice(0, 5) + ')']];
+    if (id === 'tarimas') l.push(['Descarte', pct(k.descartePct)], ['Inventario vs. sistema', pct(k.difInv)]);
+    if (id === 'stretch') l.push(['Stretch por pallet', fmt(k.grPallet) + ' g'], ['Inventario vs. sistema', pct(k.difInv)]);
+    if (id === 'gasoil') l.push(['Despachos sin odómetro', pct(k.sinOdo)], ['Cargado 22–6 h', pct(k.nocturno)]);
+    if (id === 'cal') l.push(['Controles físicos', fmt(k.controles)], ['Ingresos', fmt(k.ingTotal) + ' bolsas']);
+    return l.map(x => `<div><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+  };
+  const bloques = ORDEN.map(id => `<div class="inf-bloque" style="--c:var(--c-${id})"><h4>${INSUMOS[id].emoji} ${INSUMOS[id].nombre}</h4><div class="inf-claves">${claves(id)}</div><div class="inf-chart"><canvas id="inf-${id}"></canvas></div></div>`).join('');
+  const al = alertas();
+  app().innerHTML = `<section class="vista">
+    <div class="hero no-print"><div><div class="eyebrow">Reporte para producción</div><h1>Informe <span>imprimible</span></h1><p class="sub">Estado, indicadores y gráficos clave en dos hojas A4.</p></div>
+      <div class="inf-ctrl"><div class="seg" id="segInf">${PER_INF.map(x => `<button data-per="${x.id}" class="${x.id === pid ? 'on' : ''}"><span>${x.e}</span>${x.n}</button>`).join('')}</div><button class="btn pri" id="btnImprimir">🖨️ Imprimir o guardar PDF</button></div></div>
+    <article class="informe" id="inf">
+      <header class="inf-cab"><img src="img/logo-cmp.png" alt=""><div><div class="inf-emp">Cerámica Marcos Paz · Planta Cevil</div><h2>Informe de insumos críticos</h2><div class="inf-sub">Tarimas · Stretch · Gasoil · Cal</div></div>
+        <dl><dt>Período</dt><dd>${esc(p0.nombre)}: ${fFecha(p0.a)} al ${fFecha(p0.b)}</dd><dt>Comparado con</dt><dd>${p0.cmp ? esc(base.P[p0.cmp].nombre) : '—'}</dd><dt>Emitido</dt><dd>${ahora.toLocaleDateString('es-AR')} ${ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}</dd><dt>Elaborado por</dt><dd>${esc(ses ? ses.usuario : LS.get('ic_usuario', '') || '—')}</dd></dl></header>
+      <h3 class="inf-h">1 · Estado actual del stock</h3>
+      <div class="inf-estado">${tarjetas}</div>
+      <h3 class="inf-h">2 · Indicadores del período</h3>
+      ${tabla}
+      <h3 class="inf-h">3 · Alertas y acciones</h3>
+      <ul class="inf-alertas">${al.map(a => `<li class="${a[0]}"><span>${a[1]}</span>${esc(a[2])}</li>`).join('')}</ul>
+      <h3 class="inf-h">4 · Evolución del stock por insumo</h3>
+      <div class="inf-bloques">${bloques}</div>
+      <div class="inf-sec"><h3 class="inf-h">5 · Gasoil por departamento</h3>
+      <div class="inf-gas"><div>${tablaDeptosGasoil(p0, base.P)}</div><div class="inf-chart alto"><canvas id="inf-dep"></canvas></div></div></div>
+      <div class="inf-sec"><h3 class="inf-h">6 · Unidades de mayor consumo</h3>
+      ${tablaUnidadesGasoil(p0, base.P, { top: 3 })}</div>
+      <footer class="inf-pie">Fuente: planillas «Stock Insumos Criticos CEVIL» y «Combustible CMP». Consumo diario = consumo ÷ días calendario. PP: punto de pedido · SS: stock de seguridad. Datos al ${fFecha(M.fin)}.</footer>
+    </article></section>`;
+  $('segInf').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.perInf = b.dataset.per; vistaInforme(); }; });
+  requestAnimationFrame(() => moverPill($('segInf')));
+  $('btnImprimir').onclick = () => window.print();
+  ST.cvEl = $('inf');
+  const dpr = window.devicePixelRatio;
+  ORDEN.forEach(id => {
+    const x = M[id], I = INSUMOS[id], ci = colorIns(id);
+    const { p } = periodoInforme(id, pid);
+    const sr = x.serie.filter(r => r.f >= p.a && r.f <= p.b && r.stock !== null && r.stock !== undefined);
+    grafico('inf-' + id, {
+      type: 'line',
+      data: { labels: sr.map(r => fFecha(r.f).slice(0, 5)), datasets: [
+        { label: 'Stock', data: sr.map(r => r.stock), borderColor: ci, backgroundColor: alfa(ci, .18), fill: true, pointRadius: 0, borderWidth: 1.8 },
+        { label: 'PP', data: sr.map(() => x.pp), borderColor: cv('--warn'), borderDash: [5, 3], pointRadius: 0, borderWidth: 1.2 },
+        { label: 'SS', data: sr.map(() => x.ss), borderColor: cv('--bad'), borderDash: [2, 2], pointRadius: 0, borderWidth: 1.2 }
+      ] },
+      options: { animation: false, devicePixelRatio: Math.max(2, dpr), maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: Object.assign(ejeX(), { ticks: { maxTicksLimit: 6, maxRotation: 0, font: { size: 9 } } }), y: Object.assign(ejeY(0), { ticks: { callback: v => fmt(v), font: { size: 9 } } }) } }
+    });
+  });
+  graficoDeptosMes('inf-dep', false);
+  if (ST.charts['inf-dep']) { ST.charts['inf-dep'].options.devicePixelRatio = Math.max(2, dpr); ST.charts['inf-dep'].resize(); }
+  ST.cvEl = null;
 }
 
 function vistaSinDatos() {
@@ -743,13 +960,13 @@ function render() {
   if (INSUMOS[ST.vista]) ST.insumo = ST.vista;
   pintarNav();
   destruirTodos();
-  if (!ST.modelo) { if (ST.vista === 'parametros' || !conexion().url) vistaSinDatos(); return; }
+  if (!ST.modelo) { if (!conexion().url) vistaSinDatos(); else esqueleto(); return; }
   const v = ST.vista;
   if (v === 'resumen') vistaResumen();
   else if (INSUMOS[v]) vistaInsumo(v);
-  else if (v === 'registrar') vistaRegistrar();
+  else if (v === 'informe') vistaInforme();
   else if (v === 'movimientos') vistaMovimientos();
-  else if (v === 'parametros') vistaParametros();
+  else if (v === 'admin') vistaAdmin();
 }
 
 function ocultarSplash() {
@@ -793,6 +1010,10 @@ function init() {
   $('btnTema').textContent = temaActual() === 'dark' ? '☀️' : '🌙';
   $('btnTema').onclick = alternarTema;
   $('btnRefrescar').onclick = () => cargar(true);
+  $('btnSesion').onclick = () => { if (esAdmin()) salir(); else location.hash = '#/admin'; };
+  window.onSesionVencida = () => { pintarSesion(); toast('La sesión venció: volvé a ingresar', 'warn'); };
+  pintarSesion();
+  setInterval(() => { if (!sesion() && $('btnSesion').querySelector('span').textContent !== 'Ingresar') { pintarSesion(); if (ST.vista === 'admin') render(); } }, 60000);
   let i = 0;
   ocultarSplash._t = setInterval(() => { $('splashTxt').textContent = FRASES[++i % FRASES.length]; }, 900);
   reloj();

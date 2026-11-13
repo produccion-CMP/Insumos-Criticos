@@ -51,13 +51,23 @@ async function apiGet() {
   return j.data;
 }
 
+function sesion() {
+  const s = LS.get('ic_ses', null);
+  return s && s.token && s.vence > Date.now() ? s : null;
+}
+const esAdmin = () => !!sesion();
+
 async function apiPost(payload) {
   const { url, key } = conexion();
   if (!url) throw new Error('Configurá la URL de Apps Script en la pestaña Parámetros');
-  const r = await fetch(url, { method: 'POST', body: JSON.stringify(Object.assign({ key }, payload)) });
+  const ses = sesion();
+  const r = await fetch(url, { method: 'POST', body: JSON.stringify(Object.assign({ key, token: ses ? ses.token : null }, payload)) });
   const j = await r.json();
-  if (!j.ok) throw new Error(j.error || 'No se pudo guardar');
-  return j.msg;
+  if (!j.ok) {
+    if (/Sesión vencida|Sesión .*requerida/i.test(j.error || '')) { LS.set('ic_ses', null); if (window.onSesionVencida) window.onSesionVencida(); }
+    throw new Error(j.error || 'No se pudo guardar');
+  }
+  return j.msg !== undefined ? j.msg : j;
 }
 
 function construirModelo(D) {
@@ -190,6 +200,16 @@ function kpis(id, p) {
     controles: ctrls.length, ajusteTotal: ajustes.length ? sumar(ajustes, 'aj') : null,
     ajusteAbsProm: ajustes.length ? sumar(ajustes.map(r => Math.abs(r.aj))) / ajustes.length : null
   };
+  const sDias = s.filter(r => r.f >= a);
+  const iPico = sDias.reduce((im, r, i) => (r.cons > (sDias[im] ? sDias[im].cons : -1) ? i : im), 0);
+  k.fechaPico = sDias.length ? sDias[iPico].f : null;
+  const hab = [], fde = [];
+  sDias.forEach(r => { const wd = new Date(r.f + 'T12:00:00Z').getUTCDay(); (wd === 0 || wd === 6 ? fde : hab).push(r.cons); });
+  k.lHabil = hab.length ? sumar(hab) / hab.length : null;
+  k.lFinde = fde.length ? sumar(fde) / fde.length : null;
+  k.diasSin = consDias.filter(v => !(v > 0)).length;
+  const media = consDias.length ? sumar(consDias) / consDias.length : 0;
+  k.cv = media > 0 && consDias.length > 1 ? Math.sqrt(sumar(consDias.map(v => (v - media) * (v - media))) / (consDias.length - 1)) / media : null;
   if (id === 'tarimas') {
     const desc = sumar(s, 'desc');
     k.descarte = desc;
@@ -222,6 +242,9 @@ function kpis(id, p) {
     k.nocturno = k.cons ? 100 * noct / k.cons : null;
     const son = s.filter(r => r.aj !== null);
     k.mediciones = son.length;
+    const porU = {};
+    tx.forEach(t => { porU[t.u] = (porU[t.u] || 0) + t.l; });
+    k.top3 = k.cons ? 100 * sumar(Object.values(porU).sort((x, y) => y - x).slice(0, 3)) / k.cons : null;
     k.difSonda = son.length ? sumar(son, 'aj') / son.length : null;
   }
   return k;
@@ -315,4 +338,54 @@ function turnoActual(d) {
   if (h >= 22 || h < 6) return { t: 'T1', txt: '22:00 – 06:00', avance: ((h >= 22 ? h - 22 : h + 2)) / 8 };
   if (h < 14) return { t: 'T2', txt: '06:00 – 14:00', avance: (h - 6) / 8 };
   return { t: 'T3', txt: '14:00 – 22:00', avance: (h - 14) / 8 };
+}
+
+function eficiencia(tx, dep) {
+  const v = tx.filter(t => t.odo !== null && t.odo > 0 && t.odo !== 9999 && t.odo !== 99999).sort((a, b) => (a.f + a.hora < b.f + b.hora ? -1 : 1));
+  if (v.length < 6) return {};
+  const med = v.map((t, i) => { const w = v.slice(Math.max(0, i - 3), i + 4).map(x => x.odo).sort((a, b) => a - b); return w[Math.floor(w.length / 2)]; });
+  const k = v.filter((t, i) => Math.abs(t.odo - med[i]) <= 0.05 * Math.abs(med[i]) + 50);
+  const dif = [];
+  for (let i = 1; i < k.length; i++) dif.push({ d: k[i].odo - k[i - 1].odo, l: k[i].l });
+  const pos = dif.filter(x => x.d > 0).map(x => x.d).sort((a, b) => a - b);
+  if (!pos.length) return {};
+  const lim = 5 * pos[Math.floor(pos.length / 2)];
+  const ok = dif.filter(x => x.d > 0 && x.d < lim);
+  if (ok.length < 4) return {};
+  const L = sumar(ok, 'l'), D = sumar(ok, 'd');
+  if (dep === 'Máquinas cargadoras' || dep === 'Autoelevadores') { const r = L / D; return r >= 1 && r <= 25 ? { lh: r } : {}; }
+  if (dep === 'Camiones' || dep === 'Camionetas') { const r = D / L; return r >= 1 && r <= 12 ? { kml: r } : {}; }
+  return {};
+}
+
+function gasoilUnidades(p, P) {
+  const ins = ST.modelo.gasoil, fin = ST.modelo.fin;
+  const dias = Math.max(dn(p.b) - dn(p.a < ins.inicio ? ins.inicio : p.a) + 1, 1);
+  const vida = {};
+  ins.tx.forEach(t => { if (t.f > fin) return; const v = (vida[t.u] = vida[t.u] || { a: t.f, b: t.f }); if (t.f < v.a) v.a = t.f; if (t.f > v.b) v.b = t.f; });
+  const tx = ins.tx.filter(t => t.f >= p.a && t.f <= p.b);
+  const tot = sumar(tx, 'l');
+  const c = p.cmp ? P[p.cmp] : null;
+  const diasC = c ? Math.max(dn(c.b) - dn(c.a < ins.inicio ? ins.inicio : c.a) + 1, 1) : 1;
+  const lc = {};
+  if (c) ins.tx.filter(t => t.f >= c.a && t.f <= c.b).forEach(t => { lc[t.u] = (lc[t.u] || 0) + t.l; });
+  const g = {};
+  tx.forEach(t => { (g[t.u] = g[t.u] || []).push(t); });
+  return Object.keys(g).map(u => {
+    const arr = g[u], v = vida[u] || { a: p.a, b: p.b };
+    const s0 = Math.max(dn(p.a), dn(v.a));
+    const e0 = dn(v.b) >= dn(fin) - 45 ? dn(p.b) : Math.min(dn(p.b), dn(v.b));
+    const act = Math.max(e0 - s0 + 1, 1);
+    const L = sumar(arr, 'l');
+    const ef = eficiencia(arr, arr[0].d);
+    const ldc = c ? (lc[u] || 0) / diasC : null;
+    return { u, d: arr[0].d, l: L, lDia: L / dias, lDiaAct: L / act, diasAct: act, part: tot ? 100 * L / tot : null, n: arr.length, lDesp: L / arr.length, intervalo: act / arr.length, lh: ef.lh || null, kml: ef.kml || null, lDiaCmp: ldc, delta: ldc ? 100 * (L / dias - ldc) / ldc : null, nueva: c ? !lc[u] : false };
+  }).sort((a, b) => b.l - a.l);
+}
+
+function gasoilOperadores(p) {
+  const tx = ST.modelo.gasoil.tx.filter(t => t.f >= p.a && t.f <= p.b);
+  const tot = sumar(tx, 'l'), g = {};
+  tx.forEach(t => { g[t.op] = g[t.op] || { l: 0, n: 0 }; g[t.op].l += t.l; g[t.op].n++; });
+  return Object.entries(g).map(([op, x]) => ({ op, l: x.l, n: x.n, part: tot ? 100 * x.l / tot : null })).sort((a, b) => b.l - a.l);
 }

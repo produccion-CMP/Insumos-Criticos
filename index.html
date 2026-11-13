@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Insumos Críticos · CEVIL</title>
+  <meta name="description" content="Control de stock y consumo de tarimas, stretch, gasoil y cal · Planta Cevil">
   <link rel="icon" href="img/logo-cmp.png">
   <link rel="apple-touch-icon" href="img/logo-cmp.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,10 +31,11 @@
 <body>
   <div id="splash">
     <span class="logo-tile"><img src="img/logo-cmp.png" alt=""></span>
-    <div class="orbita" aria-hidden="true"><span>🪵</span><span>🧻</span><span>⛽</span><span>🪣</span></div>
+    <div class="splash-emp">Cerámica Marcos Paz · Planta Cevil</div>
     <h2>Insumos Críticos</h2>
-    <p id="splashTxt">Contando tarimas…</p>
+    <div class="splash-ins" aria-hidden="true"><span>🪵</span><span>🧻</span><span>⛽</span><span>🪣</span></div>
     <div class="barra"><span></span></div>
+    <p id="splashTxt">Conectando con la planilla…</p>
   </div>
   <div id="toploader"><span></span></div>
 
@@ -51,12 +53,14 @@
       <span class="estado-red" id="red"><i></i><span>Conectando</span></span>
       <button class="btn ghost icon" id="btnRefrescar" title="Actualizar datos" aria-label="Actualizar datos">🔄</button>
       <button class="btn ghost icon" id="btnTema" title="Cambiar tema claro u oscuro" aria-label="Cambiar tema">🌙</button>
+      <button class="btn sm sesion" id="btnSesion"></button>
     </div>
   </header>
 
   <main id="app"></main>
   <nav class="bottom-nav" id="bnav" aria-label="Secciones"></nav>
   <div id="toasts" aria-live="polite"></div>
+  <div id="overlay" aria-live="polite"><div class="ov-caja"><div class="ov-anim"><span>🪵</span><span>🧻</span><span>⛽</span><span>🪣</span></div><div class="spin lg"></div><p id="overlayTxt">Guardando…</p></div></div>
 
   <dialog id="dlg">
     <form method="dialog">
