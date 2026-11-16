@@ -7,7 +7,7 @@ const LS = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
 
-const conexion = () => ({ url: LS.get('ic_url', '') || CONF.SCRIPT_URL, key: LS.get('ic_key', '') || CONF.API_KEY });
+const conexion = () => ({ url: CONF.SCRIPT_URL || LS.get('ic_url', ''), key: CONF.SCRIPT_URL ? CONF.API_KEY : (LS.get('ic_key', '') || CONF.API_KEY) });
 
 const INSUMOS = {
   tarimas: { ico: '<svg class="ic ic-tarimas" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6.5" width="19" height="3" rx=".6"/><rect x="4" y="9.5" width="3" height="4.5"/><rect x="10.5" y="9.5" width="3" height="4.5"/><rect x="17" y="9.5" width="3" height="4.5"/><rect x="2.5" y="14" width="19" height="3" rx=".6"/></svg>', emoji: '🪵', desc: 'Pallets de madera', nombre: 'Tarimas', u: 'u', uLarga: 'tarimas', dec: 0, color: '#a0522d', medio: { metodo: 'mediana', dias: 120 }, defSS: 7, defPP: 21, necesidad: 'Tarimas' },
@@ -42,13 +42,14 @@ const hoyLocal = () => { const d = new Date(); return new Date(d.getTime() - d.g
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const fMes = m => MESES[+m.slice(5, 7) - 1] + ' ' + m.slice(2, 4);
 
-async function apiGet() {
+async function apiGet(fresco) {
   const { url, key } = conexion();
   if (!url) throw new Error('Configurá la URL de Apps Script en Administración → Conexión');
   const ses = sesion();
-  const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key || '') + (ses ? '&token=' + encodeURIComponent(ses.token) : '') + '&t=' + Date.now());
+  const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key || '') + (ses ? '&token=' + encodeURIComponent(ses.token) : '') + (fresco ? '&fresh=1' : '') + '&t=' + Date.now());
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'Error al leer los datos');
+  if (j.usuarios) { LS.set('ic_usrs', j.usuarios); ST.usrsFrescos = true; }
   if (ses) {
     if (!j.perfil) { LS.set('ic_ses', null); if (window.onSesionVencida) window.onSesionVencida(); }
     else LS.set('ic_ses', Object.assign({}, ses, j.perfil));

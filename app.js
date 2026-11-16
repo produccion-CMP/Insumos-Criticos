@@ -945,18 +945,30 @@ function vistaReposicion() {
 
 function vistaConexion() {
   const c = conexion();
-  $('adm').innerHTML = `<div class="card"><div class="card-h"><div class="t"><h3>🔌 Conexión con la planilla</h3><span class="sub">URL de la aplicación web de Apps Script y clave de lectura. Se guardan solo en este navegador; la URL por defecto está en config.js.</span></div></div>
-    <form class="form" id="formCx" autocomplete="off"><label class="f w2">URL /exec<input id="cUrl" type="url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="f">Clave de lectura<input id="cKey" type="password" value="${esc(c.key || '')}" placeholder="Opcional"></label>
-    <div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">🔌 Guardar y probar</button></div></form></div>
-    <div class="card"><div class="card-h"><div class="t"><h3>👤 Sesión</h3><span class="sub">Ingresaste como <b>${esc((sesion() || {}).usuario || '')}</b>. La sesión vence a las ${sesion() ? new Date(sesion().vence).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}.</span></div></div>
+  const fija = !!CONF.SCRIPT_URL;
+  const snippet = `window.APP_CONFIG = {\n  SCRIPT_URL: '${c.url || 'https://script.google.com/macros/s/.../exec'}',\n  API_KEY: '${c.key || ''}',\n  PLANTA: 'Cerámica Marcos Paz · Planta Cevil'\n};`;
+  $('adm').innerHTML = (fija ? `<div class="card"><div class="card-h"><div class="t"><h3>🔌 Conexión con la planilla</h3><span class="sub">Fijada en <b>config.js</b> para todos los usuarios y navegadores.</span></div></div>
+      <dl class="datos-u"><dt>URL</dt><dd style="word-break:break-all">${esc(c.url)}</dd><dt>Datos</dt><dd>${ST.datos ? 'generados ' + new Date(ST.datos.generado).toLocaleString('es-AR', { hour12: false }) : '—'}</dd></dl>
+      <div class="acciones" style="margin-top:0"><button class="btn pri" id="btnFresco">${ICO.refrescar} Releer la planilla ahora</button></div>
+      <p class="nota">El servidor guarda los datos en caché y los renueva solo cada 5 minutos y después de cada registro. Este botón fuerza la relectura.</p></div>`
+    : `<div class="card"><div class="card-h"><div class="t"><h3>🔌 Conexión con la planilla</h3><span class="sub">Hoy la URL se guarda solo en este navegador. Para que todos entren conectados, pegá este contenido en <b>config.js</b> del repositorio.</span></div></div>
+      <form class="form" id="formCx" autocomplete="off"><label class="f w2">URL /exec<input id="cUrl" type="url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="f">Clave de lectura<input id="cKey" type="password" value="${esc(c.key || '')}" placeholder="Opcional"></label>
+      <div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">🔌 Guardar y probar</button></div></form>
+      <pre class="snippet" id="cfgSnip">${esc(snippet)}</pre><div class="acciones" style="margin-top:6px"><button class="btn sm" id="btnCopiarCfg" type="button">Copiar config.js</button></div></div>`) +
+    `<div class="card"><div class="card-h"><div class="t"><h3>👤 Sesión</h3><span class="sub">Ingresaste como <b>${esc((sesion() || {}).usuario || '')}</b>. La sesión vence a las ${sesion() ? new Date(sesion().vence).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}.</span></div></div>
     <button class="btn dan" id="btnSalir2">🚪 Cerrar sesión</button></div>`;
-  $('formCx').onsubmit = async e => {
-    e.preventDefault();
-    LS.set('ic_url', $('cUrl').value.trim());
-    LS.set('ic_key', $('cKey').value.trim());
-    await cargar(true);
-    if (ST.datos) toast('Conexión correcta', 'ok');
-  };
+  if (fija) $('btnFresco').onclick = async () => { await cargar(true, true); if (ST.datos) toast('Planilla releída', 'ok'); vistaConexion(); };
+  else {
+    $('formCx').onsubmit = async e => {
+      e.preventDefault();
+      LS.set('ic_url', $('cUrl').value.trim());
+      LS.set('ic_key', $('cKey').value.trim());
+      await cargar(true);
+      if (ST.datos) toast('Conexión correcta', 'ok');
+      vistaConexion();
+    };
+    $('btnCopiarCfg').onclick = () => { navigator.clipboard.writeText($('cfgSnip').textContent).then(() => toast('Copiado', 'ok'), () => toast('No se pudo copiar', 'bad')); };
+  }
   $('btnSalir2').onclick = salir;
 }
 
@@ -968,7 +980,7 @@ function vistaLogin() {
       <h2>🔐 Administración</h2>
       <p class="sub">Elegí tu usuario e ingresá tu clave. Los permisos dependen del rol que te asignó el administrador.</p>
       <form id="formLogin" class="login-form" autocomplete="on">
-        <label class="f">👤 Usuario<span id="lUsrCampo"><select id="lUsuario" required disabled><option>Cargando usuarios…</option></select></span></label>
+        <label class="f">👤 Usuario<span id="lUsrCampo"></span></label>
         <label class="f">🔑 Clave<input id="lClave" type="password" required autocomplete="current-password"></label>
         <button class="btn pri brillo" type="submit" id="btnLogin">Ingresar</button>
       </form>
@@ -987,9 +999,10 @@ function vistaLogin() {
       LS.set('ic_usuario', usuario);
       LS.set('ic_ses', { token: r.token, vence: r.vence, usuario: r.usuario, nombre: r.nombre, rol: r.rol, verInventario: !!r.verInventario });
       toast('Bienvenido/a, ' + (r.nombre || r.usuario), 'ok');
+      if (r.usuarios) LS.set('ic_usrs', r.usuarios);
       pintarSesion();
-      LS.set('ic_cache', null);
-      await cargar(true);
+      render();
+      if (r.verInventario) cargar(true);
     } catch (err) {
       toast(err.message, 'bad');
       $('lClave').classList.add('inv');
@@ -999,21 +1012,33 @@ function vistaLogin() {
   };
 }
 
-async function cargarListaUsuarios() {
+function pintarListaUsuarios(l) {
   const previo = LS.get('ic_usuario', '');
-  const libre = nota => {
+  if (!$('lUsrCampo')) return;
+  if (!l || !l.length) {
     $('lUsrCampo').innerHTML = `<input id="lUsuario" type="text" maxlength="40" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej. ezequiel" value="${esc(previo)}">`;
-    if (nota) $('lNota').textContent = nota;
-  };
+    $('lNota').textContent = 'Primer ingreso: escribí el usuario que vas a usar y la clave maestra (ADMIN_KEY). Ese usuario queda como administrador.';
+    return;
+  }
+  const sel = $('lUsuario') && $('lUsuario').tagName === 'SELECT' ? $('lUsuario').value : '';
+  const elegido = sel || previo;
+  $('lUsrCampo').innerHTML = `<select id="lUsuario" required autocomplete="username"><option value="">Elegí tu usuario…</option>${l.map(u => `<option value="${esc(u.usuario)}" ${u.usuario === elegido ? 'selected' : ''}>${esc(u.nombre)} (${esc(u.usuario)})</option>`).join('')}</select>`;
+  $('lNota').textContent = '¿No figurás en la lista? Pedile al administrador que te cree un usuario.';
+  if (elegido && l.find(u => u.usuario === elegido) && document.activeElement !== $('lClave')) $('lClave').focus();
+}
+
+async function cargarListaUsuarios() {
+  const guardada = LS.get('ic_usrs', null);
+  if (guardada && guardada.length) pintarListaUsuarios(guardada);
+  else if ($('lUsrCampo')) $('lUsrCampo').innerHTML = '<select id="lUsuario" disabled><option>Cargando usuarios…</option></select>';
+  if (guardada && guardada.length && ST.usrsFrescos) return;
   try {
     const r = await apiPost({ accion: 'listaUsuarios' });
-    if (!$('lUsrCampo')) return;
-    const l = r.usuarios || [];
-    if (!l.length) { libre('Primer ingreso: escribí el usuario que vas a usar y la clave maestra (ADMIN_KEY). Ese usuario queda como administrador.'); return; }
-    $('lUsrCampo').innerHTML = `<select id="lUsuario" required autocomplete="username"><option value="">Elegí tu usuario…</option>${l.map(u => `<option value="${esc(u.usuario)}" ${u.usuario === previo ? 'selected' : ''}>${esc(u.nombre)} (${esc(u.usuario)})</option>`).join('')}</select>`;
-    if (previo && l.find(u => u.usuario === previo)) $('lClave').focus();
+    LS.set('ic_usrs', r.usuarios || []);
+    ST.usrsFrescos = true;
+    pintarListaUsuarios(r.usuarios || []);
   } catch (err) {
-    if ($('lUsrCampo')) libre('No se pudo leer la lista de usuarios: escribí tu usuario.');
+    if (!(guardada && guardada.length)) pintarListaUsuarios([]);
   }
 }
 
@@ -1330,6 +1355,11 @@ function vistaInforme() {
 
 function vistaSinDatos() {
   const c = conexion();
+  if (CONF.SCRIPT_URL) {
+    app().innerHTML = `<section class="vista login-wrap"><div class="card login"><span class="logo-tile"><img src="img/logo-cmp.png" alt=""></span><div class="eyebrow">Sin datos</div><h2>No se pudo leer la planilla</h2><p class="sub">Revisá la conexión a internet y volvé a intentar. Si persiste, avisale al administrador.</p><button class="btn pri" id="btnReint">${ICO.refrescar} Reintentar</button></div></section>`;
+    $('btnReint').onclick = () => cargar(true);
+    return;
+  }
   app().innerHTML = `<section class="vista"><div class="hero"><div><div class="eyebrow">Primer uso</div><h1>Conectar con la <span>planilla</span></h1><p class="sub">Pegá la URL /exec de la aplicación web de Apps Script.</p></div></div>
     <div class="card"><form class="form" id="formCx0"><label class="f w2">URL /exec<input id="cUrl0" type="url" value="${esc(c.url || '')}" required></label><label class="f">Clave<input id="cKey0" type="password" value="${esc(c.key || '')}"></label><div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">🔌 Conectar</button></div></form></div></section>`;
   $('formCx0').onsubmit = async e => { e.preventDefault(); LS.set('ic_url', $('cUrl0').value.trim()); LS.set('ic_key', $('cKey0').value.trim()); await cargar(true); };
@@ -1368,7 +1398,7 @@ function ocultarSplash() {
   if (s && !s.classList.contains('fuera')) { s.classList.add('fuera'); clearInterval(ocultarSplash._t); }
 }
 
-async function cargar(forzar) {
+async function cargar(forzar, fresco) {
   if (!forzar) {
     const cache = LS.get('ic_cache', null);
     if (cache) { aplicar(cache, true); ocultarSplash(); }
@@ -1378,7 +1408,7 @@ async function cargar(forzar) {
   $('btnRefrescar').classList.add('girando');
   estadoRed('cache', 'Actualizando');
   try {
-    const d = await apiGet();
+    const d = await apiGet(fresco);
     LS.set('ic_cache', d);
     aplicar(d, false);
   } catch (err) {
@@ -1405,7 +1435,7 @@ function init() {
   ST.per = LS.get('ic_per', 'hist');
   $('btnTema').innerHTML = icoTema(); $('btnRefrescar').innerHTML = ICO.refrescar;
   $('btnTema').onclick = alternarTema;
-  $('btnRefrescar').onclick = () => cargar(true);
+  $('btnRefrescar').onclick = () => cargar(true, true);
   $('btnSesion').onclick = () => { if (sesion()) ST.admSec = 'cuenta'; location.hash = '#/admin'; if (ST.vista === 'admin') render(); };
   document.addEventListener('click', e => {
     if (document.body.classList.contains('modo-ayuda') && !e.target.closest('#btnModoAyuda, #pop, .top, .bottom-nav, dialog')) {

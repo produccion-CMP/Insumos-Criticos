@@ -74,9 +74,10 @@ Cada vez que cambies `Code.gs`, hacé *Implementar → Administrar implementacio
 ### 2. Frontend (GitHub Pages)
 
 1. En el repositorio `produccion-CMP/Insumos-Criticos` subí `index.html`, `styles.css`, `datos.js`, `app.js`, `config.js`, `README.md` y la carpeta `img/`. **No subas datos ni claves.**
-2. Si venías de una versión anterior: reemplazá `Code.gs`, publicá una **nueva versión** de la implementación y entrá con usuario + `ADMIN_KEY` para crear el primer administrador.
-3. En `config.js` podés dejar la URL de `/exec` en `SCRIPT_URL`. La clave **no** debe ir al repositorio: el administrador la carga una sola vez en *Administración → Conexión* y queda guardada en su navegador.
-4. En *Settings → Pages*, elegí *Deploy from a branch*, rama `main` y carpeta `/ (root)`.
+2. **Rendimiento (v6):** en el editor de Apps Script elegí la función `instalar` y tocá **Ejecutar** una vez (pide autorizar «ejecutar en segundo plano»). Crea un activador que cada 5 minutos relee las planillas y guarda los datos comprimidos en caché; la app los sirve desde ahí en menos de 2 s. Cada registro hecho desde la app actualiza la caché al instante y el botón ⟳ fuerza una relectura.
+3. Si venías de una versión anterior: reemplazá `Code.gs`, publicá una **nueva versión** de la implementación y entrá con usuario + `ADMIN_KEY` para crear el primer administrador.
+4. En `config.js` (obligatorio para que cualquier navegador, incluso en modo incógnito, entre ya conectado) completá `SCRIPT_URL` con la URL `/exec`. Si definiste la propiedad `API_KEY`, copiala también en `API_KEY` de `config.js`: el repositorio es público, así que esa clave solo filtra accesos casuales. La protección real son los usuarios y roles (escrituras, inventarios y ajustes).
+5. En *Settings → Pages*, elegí *Deploy from a branch*, rama `main` y carpeta `/ (root)`.
 
 ## Qué escribe la aplicación en las planillas
 
@@ -95,3 +96,14 @@ Cada vez que cambies `Code.gs`, hacé *Implementar → Administrar implementacio
 | Todas | LogApp (se crea sola) | Fecha y hora, usuario, acción y detalle (sin claves ni tokens) |
 
 Las columnas calculadas de las hojas `StockDiario*` (ingresos, envíos, consumos importados del Informe de Producción y stock) no se tocan: siguen funcionando con sus fórmulas.
+
+
+## Rendimiento y caché (v6)
+
+| Qué | Cómo |
+|---|---|
+| Lectura de datos | El servidor arma los datos una vez, los comprime (gzip) y los guarda en la caché del script por partes. Cada consulta los devuelve sin abrir las planillas. Hay dos versiones: pública y con inventarios/ajustes |
+| Renovación | Activador `precalentar` cada 5 minutos, después de cada registro desde la app y con ⟳ (relectura forzada) |
+| Usuarios | Lista en caché (se invalida al crear, editar o cambiar clave). La lista viaja con los datos, así que el selector de usuario aparece al instante |
+| Inicio de sesión | Sin bloqueo ni escrituras en la planilla: el «último ingreso» y el registro en LogApp se guardan en cola y se vuelcan en el activador |
+| Conexión | `config.js` tiene prioridad sobre lo guardado en cada navegador |

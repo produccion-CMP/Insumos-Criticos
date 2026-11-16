@@ -881,3 +881,5 @@ tr.tenue td { color: var(--faint); font-size: .8rem; }
 .login h2 .ic { width: 22px; height: 22px; }
 #lUsrCampo { display: block; }
 #lUsrCampo select, #lUsrCampo input { width: 100%; }
+
+.snippet { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 600 .78rem/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; margin: 10px 0 0; }
