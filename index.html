@@ -51,8 +51,8 @@
           <div><span class="turno" id="relojTurno">T-</span><small id="relojRango"></small><i><span id="relojAvance"></span></i></div>
         </div>
         <span class="estado-red" id="red"><i></i><span>Conectando</span></span>
-        <button class="btn ghost sm" id="btnRefrescar" title="Volver a leer la planilla">Actualizar</button>
-        <button class="btn ghost sm" id="btnTema" title="Cambiar tema claro u oscuro">Modo oscuro</button>
+        <button class="btn ghost ico-btn" id="btnRefrescar" title="Actualizar: volver a leer la planilla" aria-label="Actualizar"></button>
+        <button class="btn ghost ico-btn" id="btnTema" title="Cambiar tema claro u oscuro" aria-label="Cambiar tema"></button>
         <button class="btn sm sesion" id="btnSesion"></button>
       </div>
     </div>
@@ -80,6 +80,11 @@
     <div class="glos-cab"><h3>📖 Abreviaturas y criterios</h3><button class="btn ghost sm" id="glosCerrar">Cerrar</button></div>
     <dl id="glosarioLista"></dl>
   </dialog>
+  <dialog id="dlgDetalle">
+    <div class="glos-cab"><h3 id="detTitulo"></h3><button class="btn ghost sm" id="detCerrar">Cerrar</button></div>
+    <div id="detCuerpo"></div>
+  </dialog>
+  <button type="button" class="btn-ayuda-flot" id="btnModoAyuda" title="Modo ayuda: mostrar cómo se obtiene cada dato" aria-label="Modo ayuda"></button>
   <div id="print" aria-hidden="true"></div>
 </body>
 </html>

@@ -10,10 +10,10 @@ const LS = {
 const conexion = () => ({ url: LS.get('ic_url', '') || CONF.SCRIPT_URL, key: LS.get('ic_key', '') || CONF.API_KEY });
 
 const INSUMOS = {
-  tarimas: { emoji: '🪵', desc: 'Pallets de madera', nombre: 'Tarimas', u: 'u', uLarga: 'tarimas', dec: 0, color: '#a0522d', medio: { metodo: 'mediana', dias: 120 }, defSS: 7, defPP: 21, necesidad: 'Tarimas' },
-  stretch: { emoji: '🧻', desc: 'Film de embalaje', nombre: 'Stretch', u: 'kg', uLarga: 'kg', dec: 1, color: '#0270ba', medio: { metodo: 'mediana', dias: 120 }, defSS: 12, defPP: 25, necesidad: 'Stretch' },
-  gasoil: { emoji: '⛽', desc: 'Cisterna de planta', nombre: 'Gasoil', u: 'L', uLarga: 'litros', dec: 0, color: '#3d8b37', medio: { metodo: 'promedio', dias: 90 }, defSS: 3, defPP: 7, necesidad: 'Gasoil' },
-  cal: { emoji: '🪣', desc: 'Bolsas para molienda', nombre: 'Cal', u: 'bolsas', uLarga: 'bolsas', dec: 0, color: '#7a8592', medio: { metodo: 'mediana', dias: 21 }, defSS: 3, defPP: 7, necesidad: 'Cal' }
+  tarimas: { ico: '<svg class="ic ic-tarimas" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6.5" width="19" height="3" rx=".6"/><rect x="4" y="9.5" width="3" height="4.5"/><rect x="10.5" y="9.5" width="3" height="4.5"/><rect x="17" y="9.5" width="3" height="4.5"/><rect x="2.5" y="14" width="19" height="3" rx=".6"/></svg>', emoji: '🪵', desc: 'Pallets de madera', nombre: 'Tarimas', u: 'u', uLarga: 'tarimas', dec: 0, color: '#a0522d', medio: { metodo: 'mediana', dias: 120 }, defSS: 7, defPP: 21, necesidad: 'Tarimas' },
+  stretch: { ico: '<svg class="ic ic-stretch" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="7.5" cy="5.5" rx="3.2" ry="1.7"/><ellipse cx="7.5" cy="5.5" rx="1" ry=".5"/><path d="M4.3 5.5v12.5c0 .95 1.4 1.7 3.2 1.7s3.2-.75 3.2-1.7V5.5"/><path d="M10.7 8c3.2 0 6.3.5 9 1.5v8.3c-2.7-1-5.8-1.5-9-1.5"/></svg>', emoji: '🧻', desc: 'Film de embalaje', nombre: 'Stretch', u: 'kg', uLarga: 'kg', dec: 1, color: '#0270ba', medio: { metodo: 'mediana', dias: 120 }, defSS: 12, defPP: 25, necesidad: 'Stretch' },
+  gasoil: { ico: '<svg class="ic ic-gasoil" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 20.5V5a1.5 1.5 0 0 1 1.5-1.5h6.5A1.5 1.5 0 0 1 14 5v15.5M3 20.5h12.5"/><rect x="6.5" y="6" width="5.5" height="4" rx=".6"/><path d="M14 9.5h1.5A1.5 1.5 0 0 1 17 11v5a1.25 1.25 0 0 0 2.5 0V8.5L17.5 6"/></svg>', emoji: '⛽', desc: 'Cisterna de planta', nombre: 'Gasoil', u: 'L', uLarga: 'litros', dec: 0, color: '#3d8b37', medio: { metodo: 'promedio', dias: 90 }, defSS: 3, defPP: 7, necesidad: 'Gasoil' },
+  cal: { ico: '<svg class="ic ic-cal" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5c1.6.9 7.4.9 9 0l-1.2 3c2 1.7 3.2 4.6 3.2 7.6 0 3.1-2.9 4.4-6.5 4.4s-6.5-1.3-6.5-4.4c0-3 1.2-5.9 3.2-7.6z"/><path d="M8.6 7.5h6.8"/><path d="M9.5 13.5h5M10.5 16h3"/></svg>', emoji: '🪣', desc: 'Bolsas para molienda', nombre: 'Cal', u: 'bolsas', uLarga: 'bolsas', dec: 0, color: '#7a8592', medio: { metodo: 'promedio', dias: 21 }, defSS: 3, defPP: 7, necesidad: 'Cal' }
 };
 const ORDEN = ['tarimas', 'stretch', 'gasoil', 'cal'];
 const PALETA = ['--s1', '--s3', '--s4', '--s8', '--s7', '--s2', '--s5', '--s6'];
@@ -60,9 +60,11 @@ function sesion() {
   const s = LS.get('ic_ses', null);
   return s && s.token && s.vence > Date.now() ? s : null;
 }
+const ROL_TXT = { admin: 'Administrador', operador: 'Operador', compras: 'Responsable de Compras' };
 const esAdmin = () => { const s = sesion(); return !!(s && s.rol === 'admin'); };
 const puedeRegistrar = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.rol === 'operador')); };
-const verInventario = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.verInventario)); };
+const verInventario = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.rol === 'compras' || s.verInventario)); };
+const verReportes = () => !!sesion();
 
 async function apiPost(payload) {
   const { url, key } = conexion();
@@ -182,6 +184,7 @@ function kpis(id, p) {
   const a = p.a < ins.inicio ? ins.inicio : p.a;
   const dias = dn(p.b) - dn(p.a) + 1;
   const diasDatos = Math.max(dn(p.b) - dn(a) + 1, 0);
+  if (diasDatos <= 0) return { dias, diasDatos: 0, sinDatos: true };
   const s = ins.serie.filter(r => r.f >= p.a && r.f <= p.b);
   const cons = sumar(s, 'cons');
   const consDias = s.map(r => r.cons);
@@ -203,7 +206,6 @@ function kpis(id, p) {
     stockProm, stockMin: stocks.length ? Math.min.apply(null, stocks) : null,
     diasBajoSS: ins.ss !== null ? s.filter(r => r.stock !== null && r.stock !== undefined && r.stock < ins.ss).length : null,
     diasConStock: stocks.length,
-    rotacion: stockProm ? cons / stockProm : null,
     coberturaProm: stockProm !== null && diasDatos && cons ? stockProm / (cons / diasDatos) : null,
     controles: ctrls.length, ajusteTotal: ajustes.length ? sumar(ajustes, 'aj') : null,
     ajusteAbsProm: ajustes.length ? sumar(ajustes.map(r => Math.abs(r.aj))) / ajustes.length : null
@@ -258,17 +260,28 @@ function kpis(id, p) {
   return k;
 }
 
-function compara(k, kc) { return kc && kc.lDia ? 100 * (k.lDia - kc.lDia) / kc.lDia : null; }
+function compara(k, kc) { return k && k.lDia !== null && k.lDia !== undefined && kc && kc.lDia ? 100 * (k.lDia - kc.lDia) / kc.lDia : null; }
 
 function ultimoControl(x) {
   const c = x.serie.filter(r => r.ctrl !== null && r.ctrl !== undefined).map(r => r.f).concat((x.inventario || []).map(r => r.f)).sort();
   return c.length ? { f: c[c.length - 1] } : null;
 }
 
+function semanal(id, semanas) {
+  const ins = ST.modelo[id], fin = ST.modelo.fin;
+  const a0 = isoDn(dn(fin) - 7 * (semanas || 12) + 1);
+  const a = a0 < ins.inicio ? ins.inicio : a0;
+  const dias = dn(fin) - dn(a) + 1;
+  if (dias <= 0) return { cons: null, ing: null, dias: 0, a };
+  const s = ins.serie.filter(r => r.f >= a && r.f <= fin);
+  const ing = id === 'gasoil' ? sumar(ins.movs.filter(m => m.tipo === 'Carga cisterna' && m.f >= a && m.f <= fin), 'cant') : sumar(s, 'ing');
+  return { cons: 7 * sumar(s, 'cons') / dias, ing: 7 * ing / dias, dias, a };
+}
+
 function mensual(id) {
   const ins = ST.modelo[id], fin = ST.modelo.fin;
   const acc = {}, dias = {};
-  ins.serie.forEach(r => { if (r.f > fin) return; const m = r.f.slice(0, 7); acc[m] = (acc[m] || 0) + r.cons; dias[m] = (dias[m] || 0) + 1; });
+  ins.serie.forEach(r => { if (r.f > fin || r.f < ins.inicio) return; const m = r.f.slice(0, 7); acc[m] = (acc[m] || 0) + r.cons; dias[m] = (dias[m] || 0) + 1; });
   return Object.keys(acc).sort().map(m => ({ mes: m, v: acc[m] / dias[m] }));
 }
 

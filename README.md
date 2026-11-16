@@ -11,39 +11,44 @@ Aplicación web para controlar el stock y el consumo de **Tarimas, Stretch, Gaso
 
 | Pestaña | Contenido |
 |---|---|
-| Resumen | Stock actual, cobertura en días, semáforo contra el stock de seguridad y el punto de pedido, consumo de los últimos 30 días contra los 30 previos, y alertas (bajo stock, datos atrasados, controles físicos vencidos, diferencias de inventario, pallets sin stretch cargado) |
+| Inicio | Tarjeta por insumo con stock, cobertura, curva de 60 días (al pasar el puntero muestra fecha y stock), consumo e ingresos promedio por semana (últimas 12 semanas). Cobertura contra SS/PP, últimos 30 días contra los 30 previos y alertas |
 | Tarimas / Stretch / Gasoil / Cal | KPI por período (histórico, últimos 365 días, año en curso contra el mismo tramo del año anterior, último trimestre cerrado contra el mismo trimestre del año anterior y el trimestre previo), evolución del stock con SS y PP, consumo mensual y análisis propio de cada insumo |
 | Informes | Informe A4 (o PDF) **General** o de **cada insumo**, con vista previa. Períodos: últimos 30 días, último trimestre cerrado, año en curso, últimos 365 días e histórico. También se imprime desde el botón «🖨️» de Inicio y de cada insumo (usa el período elegido en esa pantalla) |
-| Movimientos | Historial filtrable. Anular registros solo con rol administrador |
-| Administración | Requiere usuario y clave validados. Operador: Registrar y Mi cuenta. Administrador: además Reposición, Usuarios y Conexión |
+| Movimientos | Historial filtrable (requiere sesión). Anular registros solo con rol administrador |
+| Administración | Ingreso eligiendo el usuario de una lista. Operador: Registrar y Mi cuenta. Responsable de Compras: Mi cuenta. Administrador: además Reposición, Usuarios y Conexión |
+
+En cada insumo se muestran pocos registros (6 movimientos, 5 proveedores, 3 unidades por departamento, 5 controles y 4 inventarios) y el botón **Ver todos** abre el listado completo en una ventana.
 
 ### Ayuda en pantalla
 
-Cada tarjeta con KPI tiene un botón **?** que explica cómo se calcula el valor. El botón **❓ Glosario** (Inicio, cada insumo e Informes) lista todas las abreviaturas: SS, PP, P90, CV, L/h, km/L, etc. Los informes impresos incluyen al final las abreviaturas que usan.
+Cada tarjeta con KPI tiene un botón **?**: al pasar el puntero (o tocarlo) explica cómo se calcula el valor. El botón **Ayuda** (abajo a la derecha) activa el modo ayuda: al pasar el puntero por cualquier indicador muestra su explicación. El botón **❓ Glosario** (Inicio, cada insumo e Informes) lista todas las abreviaturas: SS, PP, P90, CV, L/h, km/L, etc. Los informes impresos incluyen al final las abreviaturas que usan.
 
 ### Usuarios y permisos
 
 | Rol | Puede |
 |---|---|
-| Sin sesión | Ver Inicio, insumos, informes y movimientos (sin inventarios) |
-| Operador | Registrar movimientos, controles y cargas; cambiar su clave. Inventarios solo si el admin lo autoriza |
-| Administrador | Todo: anular registros, parámetros de reposición, usuarios, conexión. Siempre ve inventarios |
+| Sin sesión | Inicio e insumos (sin ajustes ni inventarios) |
+| Operador | Informes y movimientos; registrar movimientos, controles y cargas; cambiar su clave. Ajustes e inventarios solo si el admin lo autoriza |
+| Responsable de Compras | Informes, movimientos, ajustes por control físico e inventario físico contra sistema. No registra ni modifica |
+| Administrador | Todo: anular registros, parámetros de reposición, usuarios, conexión. Siempre ve ajustes e inventarios |
 
 - Los usuarios se guardan en la hoja **UsuariosApp** (se crea sola). Las claves se guardan como hash SHA-256 con sal; las columnas de hash y sal quedan ocultas.
-- **Inventarios físicos vs. sistema**: el servidor solo los envía a administradores y a operadores con «Ver inventarios» activado. El permiso se revisa en cada consulta, así que quitarlo tiene efecto inmediato. Quien tenga acceso directo a la planilla igual puede ver esas hojas: restringí la planilla en Drive si hace falta.
+- **Ajustes e inventarios físicos vs. sistema** (controles de las 6:00 y hojas de inventario): el servidor solo los envía a administradores y a operadores con «Ver inventarios» activado. El permiso se revisa en cada consulta, así que quitarlo tiene efecto inmediato. Quien tenga acceso directo a la planilla igual puede ver esas hojas: restringí la planilla en Drive si hace falta.
 - Un usuario desactivado no puede ingresar y su sesión abierta deja de funcionar.
 
 ### KPI por insumo
 
 - **Todos:** consumo diario promedio (días calendario), consumo por día operativo, consumo total, P90 y pico diario, ingresos, entregas y promedio por entrega, stock promedio y mínimo, cobertura promedio, rotación, días bajo stock de seguridad.
-- **Tarimas:** descarte (unidades y % de lo usado), envíos, diferencia entre inventario físico y sistema, controles físicos y ajuste acumulado, ingresos por proveedor.
-- **Stretch:** gramos de stretch por pallet, bobinas por día, kg por bobina recibida, diferencia entre inventario y sistema, días con pallets sin consumo de stretch cargado, ingresos por proveedor.
-- **Gasoil:** todo lo del informe de combustible: comparativa de períodos (histórico, 365 días, año contra año anterior, trimestres), consumo por departamento y por unidad (L/día, L/día activo, días entre cargas, L/h o km/L estimados, variación), despachos por operador, hábil contra fin de semana, día pico, variabilidad, concentración en 3 unidades, despachos y litros por despacho, unidades con consumo, litros cargados entre 22 y 6 h, despachos sin odómetro válido, diferencia entre sonda y stock teórico, consumo por departamento y por unidad (con variación), cargas de cisterna.
-- **Cal:** consumo diario y del turno 1, controles físicos, ingresos.
+- **Tarimas:** descarte (unidades y % de lo usado), diferencia entre inventario físico y sistema, ingresos por proveedor.
+- **Stretch:** gramos de stretch por pallet, bobinas por día, kg por bobina recibida, diferencia entre inventario y sistema, ingresos por proveedor.
+- **Gasoil:** comparativa de períodos, consumo por departamento y por unidad (L/día, L/día activo, días entre cargas, L/h o km/L estimados, variación), despachos y litros por despacho, unidades con consumo y concentración en 3 unidades, cargas de cisterna.
+- **Cal:** consumo diario y del turno 1, ingresos.
+- **Todos:** stock promedio junto con la cobertura promedio; ajustes por control físico para usuarios autorizados.
 
 ### Criterios
 
-- **Consumo medio** (para SS, PP y cobertura): mediana de los días con consumo de los últimos 120 días para tarimas y stretch, de los últimos 21 días para cal (igual que la planilla), y promedio diario de los últimos 90 días para gasoil.
+- **Consumo medio** (para SS, PP y cobertura): mediana de los días con consumo de los últimos 120 días para tarimas y stretch; promedio por día calendario de los últimos 21 días para cal y de los últimos 90 días para gasoil.
+- **Cal:** StockDiarioCAL (fila 2 en adelante; consumo en E, control físico 6:00 en G, ajuste en J = G − I, stock en K) y MovimientosCal (ingresos). Los períodos sin datos de cal muestran «—» en lugar de cero.
 - **SS** = días SS × consumo medio; **PP** = días PP × consumo medio. Si un insumo no tiene fila en «Necesidades», se usan valores por defecto: 3 y 7 días para gasoil y cal.
 - **Stock de gasoil:** stock disponible de Control_Diaro, que descuenta la reserva de 1.100 L.
 - **Períodos:** se calculan hasta el último día completo (ayer).
@@ -69,7 +74,7 @@ Cada vez que cambies `Code.gs`, hacé *Implementar → Administrar implementacio
 ### 2. Frontend (GitHub Pages)
 
 1. En el repositorio `produccion-CMP/Insumos-Criticos` subí `index.html`, `styles.css`, `datos.js`, `app.js`, `config.js`, `README.md` y la carpeta `img/`. **No subas datos ni claves.**
-2. Si venías de la v3: reemplazá `Code.gs`, publicá una **nueva versión** de la implementación y entrá con usuario + `ADMIN_KEY` para crear el primer administrador.
+2. Si venías de una versión anterior: reemplazá `Code.gs`, publicá una **nueva versión** de la implementación y entrá con usuario + `ADMIN_KEY` para crear el primer administrador.
 3. En `config.js` podés dejar la URL de `/exec` en `SCRIPT_URL`. La clave **no** debe ir al repositorio: el administrador la carga una sola vez en *Administración → Conexión* y queda guardada en su navegador.
 4. En *Settings → Pages*, elegí *Deploy from a branch*, rama `main` y carpeta `/ (root)`.
 
