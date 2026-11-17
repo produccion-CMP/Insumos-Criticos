@@ -157,6 +157,21 @@ function consumoMedio(id, ins, hoy) {
   return mediana(s.map(r => r.cons).filter(v => v > 0));
 }
 
+const RG_OPC = [{ id: '7', n: '7 días' }, { id: '14', n: '14 días' }, { id: '30', n: '30 días' }, { id: '90', n: '90 días' }, { id: 'mes', n: 'Mes en curso' }, { id: 'todo', n: 'Todo' }];
+let RANGO = (() => { const r = LS.get('ic_rango', null); return r && r.modo ? r : { modo: '7' }; })();
+function rangoGuardar(r) { RANGO = r; LS.set('ic_rango', r); }
+
+function rangoCalc(fin, inicio) {
+  const r = RANGO;
+  let a, b = fin, nombre;
+  if (r.modo === 'custom' && /^\d{4}-\d{2}-\d{2}$/.test(r.a || '') && /^\d{4}-\d{2}-\d{2}$/.test(r.b || '')) {
+    a = r.a; b = r.b > fin ? fin : r.b; if (a > b) a = b; nombre = 'Rango personalizado';
+  } else if (r.modo === 'mes') { a = fin.slice(0, 8) + '01'; nombre = 'Mes en curso'; }
+  else if (r.modo === 'todo') { a = inicio; nombre = 'Todo el historial'; }
+  else { const n = Math.max(+r.modo || 7, 1); a = isoDn(dn(fin) - (n - 1)); nombre = 'Últimos ' + n + ' días'; }
+  return { a, b, nombre };
+}
+
 function periodos(fin, inicio) {
   const y = +fin.slice(0, 4), m = +fin.slice(5, 7), d = +fin.slice(8, 10);
   const sig = isoDn(dn(fin) + 1);
@@ -165,7 +180,11 @@ function periodos(fin, inicio) {
   const trim = (yy, n) => { while (n < 0) { n += 4; yy -= 1; } const a = isoDn(Date.UTC(yy, n * 3, 1) / 864e5); const b = isoDn(Date.UTC(yy, n * 3 + 3, 1) / 864e5 - 1); return { a, b, nombre: 'T' + (n + 1) + ' ' + yy }; };
   const t = trim(qy, qn), tp = trim(qy, qn - 1), ty = trim(qy - 1, qn);
   const finAnt = isoDn(Math.min(Date.UTC(y - 1, m - 1, d), Date.UTC(y - 1, m, 1) - 864e5) / 864e5);
+  const rg = rangoCalc(fin, inicio);
+  const rn = dn(rg.b) - dn(rg.a) + 1;
   return {
+    rango: Object.assign(rg, { cmp: 'rango_ant' }),
+    rango_ant: { a: isoDn(dn(rg.a) - rn), b: isoDn(dn(rg.a) - 1), nombre: 'los ' + rn + ' días previos' },
     hist: { a: inicio, b: fin, nombre: 'Histórico' },
     u365: { a: isoDn(dn(fin) - 364), b: fin, nombre: 'Últimos 365 días' },
     ytd: { a: y + '-01-01', b: fin, nombre: y + ' (año en curso)', cmp: 'ytd_ant' },

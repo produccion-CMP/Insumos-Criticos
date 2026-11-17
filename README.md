@@ -107,3 +107,10 @@ Las columnas calculadas de las hojas `StockDiario*` (ingresos, envíos, consumos
 | Usuarios | Lista en caché (se invalida al crear, editar o cambiar clave). La lista viaja con los datos, así que el selector de usuario aparece al instante |
 | Inicio de sesión | Sin bloqueo ni escrituras en la planilla: el «último ingreso» y el registro en LogApp se guardan en cola y se vuelcan en el activador |
 | Conexión | `config.js` tiene prioridad sobre lo guardado en cada navegador |
+
+## Filtro de rango de fechas (v7)
+
+- Por defecto todas las vistas muestran los **últimos 7 días**.
+- El filtro aparece en el detalle de cada insumo (pestaña «Rango»), en Informes y en Movimientos.
+- Opciones rápidas: 7, 14, 30 y 90 días, mes en curso y todo el historial; o fechas «Desde» y «Hasta» a elección.
+- La elección se recuerda en cada navegador. Los indicadores se comparan contra el período inmediato anterior de igual duración.

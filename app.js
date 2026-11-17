@@ -38,6 +38,7 @@ const ADMIN_SEC = [
   { id: 'cuenta', e: '👤', n: 'Mi cuenta', admin: false }
 ];
 const PERIODOS_UI = [
+  { id: 'rango', e: '📆', n: 'Rango' },
   { id: 'hist', e: '📚', n: 'Histórico' },
   { id: 'u365', e: '📅', n: 'Últimos 365 días' },
   { id: 'ytd', e: '🗓️', n: 'Año vs. anterior' },
@@ -456,10 +457,34 @@ function cardHtml(titulo, sub, cuerpo, extra, ak) {
   return `<div class="card"${extra || ''}${ak ? ` data-ak="${ak}"` : ''}><div class="card-h"><div class="t"><h3>${titulo}</h3>${sub ? `<span class="sub">${sub}</span>` : ''}</div>${btnAyuda(ak)}</div>${cuerpo}</div>`;
 }
 
+function controlRangoHtml() {
+  const fin = ST.modelo.fin, r = rangoCalc(fin, '2000-01-01');
+  const chips = RG_OPC.map(o => `<button type="button" data-rg="${o.id}" class="${RANGO.modo === o.id ? 'on' : ''}">${o.n}</button>`).join('');
+  return `<div class="rango-ctrl no-print"><div class="rg-chips" id="rgChips">${chips}</div>
+    <label class="f">Desde<input type="date" id="rgA" value="${r.a > '2000-01-01' ? r.a : ''}" max="${fin}"></label>
+    <label class="f">Hasta<input type="date" id="rgB" value="${r.b}" max="${fin}"></label></div>`;
+}
+
+function ligarRango(alCambiar) {
+  const fin = ST.modelo.fin;
+  const ch = $('rgChips');
+  if (!ch) return;
+  ch.querySelectorAll('button').forEach(b => { b.onclick = () => { rangoGuardar({ modo: b.dataset.rg }); alCambiar(); }; });
+  const custom = () => {
+    let a = $('rgA').value, b = $('rgB').value;
+    if (!a || !b) return;
+    if (a > b) { const t = a; a = b; b = t; }
+    rangoGuardar({ modo: 'custom', a, b: b > fin ? fin : b });
+    alCambiar();
+  };
+  $('rgA').onchange = custom; $('rgB').onchange = custom;
+}
+
 function vistaInsumo(id) {
   ST.insumo = id;
   const I = INSUMOS[id], M = ST.modelo, x = M[id];
   const P = periodos(M.fin, x.inicio);
+  if (!P[ST.per]) ST.per = 'rango';
   const p = P[ST.per];
   const k = kpis(id, p);
   const kc = p.cmp ? kpis(id, P[p.cmp]) : null;
@@ -509,7 +534,7 @@ function vistaInsumo(id) {
           <span class="sub">Consumo medio ${fmt(x.medio, dec)} ${u}/día · PP ${fmt(x.pp)} · SS ${fmt(x.ss)} · último control ${ctrl ? fFecha(ctrl.f) : '—'}</span></div></div>
       ${ilus(id, x.stock, x)}
     </div>
-    <div class="barra-per"><div class="seg" id="segPer">${segP}</div><div class="hero-acc">${btnGlosario()}${btnImprimir(id, 'Imprimir informe de ' + I.nombre)}</div></div><p class="rango">🗓️ ${rango}</p>
+    <div class="barra-per"><div class="seg" id="segPer">${segP}</div><div class="hero-acc">${btnGlosario()}${btnImprimir(id, 'Imprimir informe de ' + I.nombre)}</div></div>${ST.per === 'rango' ? controlRangoHtml() : ''}<p class="rango">🗓️ ${rango}</p>
     <div class="kpis stagger">${ks.map((h, i) => h.replace('class="kpi', `style="--i:${i}" class="kpi`)).join('')}</div>
     <div class="grid g2">
       ${cardHtml('📦 Evolución del stock', id === 'gasoil' ? `Disponible, sin la reserva de ${fmt(ST.datos.params.reservaCisterna)} L` : 'Con punto de pedido y stock de seguridad actuales', '<div class="chart lg"><canvas id="chStock"></canvas></div>', '', 'stock')}
@@ -520,7 +545,8 @@ function vistaInsumo(id) {
   </section>`;
 
   $('segIns').querySelectorAll('button').forEach(b => { b.onclick = () => { location.hash = '#/' + b.dataset.ins; }; });
-  $('segPer').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.per = b.dataset.per; LS.set('ic_per', ST.per); vistaInsumo(id); }; });
+  $('segPer').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.per = b.dataset.per; LS.set('ic_per2', ST.per); vistaInsumo(id); }; });
+  ligarRango(() => vistaInsumo(id));
   requestAnimationFrame(() => { moverPill($('segIns')); moverPill($('segPer')); });
 
   const ci = colorIns(id);
@@ -882,24 +908,27 @@ function vistaMovimientos() {
   app().innerHTML = `<section class="vista">
     <div class="hero"><div><div class="eyebrow">Historial</div><h1>Movi<span>mientos</span></h1><p class="sub">Ingresos, envíos, descartes, controles e inventarios.</p></div></div>
     <div class="bar"><div class="seg" id="segMov">${ORDEN.map(i => `<button data-ins="${i}" class="${i === ins ? 'on' : ''}"><span>${INSUMOS[i].ico}</span>${INSUMOS[i].nombre}</button>`).join('')}</div>
-      <div class="filtros"><label class="f">Desde<input type="date" id="mDesde" value="${fl.desde}"></label><label class="f">Hasta<input type="date" id="mHasta" value="${fl.hasta}"></label><label class="f ancho">🔎 Buscar<input type="search" id="mBuscar" placeholder="Proveedor, remito, obs." value="${esc(fl.q)}"></label></div></div>
+      <div class="filtros"><label class="f ancho">🔎 Buscar<input type="search" id="mBuscar" placeholder="Proveedor, remito, obs." value="${esc(fl.q)}"></label></div></div>
+    ${controlRangoHtml()}
     <div class="card"><div class="mov-lista" id="listaMov"></div><p class="nota" id="movNota"></p></div></section>`;
   $('segMov').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.movIns = b.dataset.ins; vistaMovimientos(); }; });
   requestAnimationFrame(() => moverPill($('segMov')));
-  ['mDesde', 'mHasta', 'mBuscar'].forEach(i => { $(i).oninput = filtrarMov; });
+  $('mBuscar').oninput = filtrarMov;
+  ligarRango(vistaMovimientos);
   filtrarMov();
 }
 
 function filtrarMov() {
   const ins = ST.movIns;
-  const fl = ST.movFiltro = { desde: $('mDesde').value, hasta: $('mHasta').value, q: $('mBuscar').value.trim() };
+  const rg = rangoCalc(ST.modelo.fin, '2000-01-01');
+  const fl = ST.movFiltro = { desde: RANGO.modo === 'todo' ? '' : rg.a, hasta: RANGO.modo === 'todo' ? '' : rg.b, q: $('mBuscar').value.trim() };
   let l = listaMovimientos(ins);
   if (fl.desde) l = l.filter(m => m.f >= fl.desde);
   if (fl.hasta) l = l.filter(m => m.f <= fl.hasta);
   if (fl.q) { const q = fl.q.toLowerCase(); l = l.filter(m => [m.tipo, m.prov, m.remito, m.obs, m.det].join(' ').toLowerCase().includes(q)); }
   const total = l.length;
   $('listaMov').innerHTML = filasMov(l.slice(0, 200), esAdmin());
-  $('movNota').textContent = total > 200 ? `Se muestran 200 de ${total} registros. Filtrá por fecha para ver el resto.` : `${total} registros.${esAdmin() ? ' Los controles físicos e inventarios se corrigen desde la planilla.' : ' Para anular registros ingresá como administrador.'}`;
+  $('movNota').textContent = total > 200 ? `Se muestran 200 de ${total} registros. Acotá el rango para ver el resto.` : `${total} registros.${esAdmin() ? ' Los controles físicos e inventarios se corrigen desde la planilla.' : ' Para anular registros ingresá como administrador.'}`;
   $('listaMov').querySelectorAll('[data-anular]').forEach(b => {
     b.onclick = async () => {
       const [hoja, fila, f, q] = b.dataset.anular.split('|');
@@ -1158,6 +1187,7 @@ function pintarSesion() {
 }
 
 const PER_INF = [
+  { id: 'rango', e: '📆', n: 'Rango' },
   { id: 'u30', e: '🗓️', n: 'Últimos 30 días' },
   { id: 'trim', e: '📊', n: 'Último trimestre' },
   { id: 'ytd', e: '📅', n: 'Año en curso' },
@@ -1336,18 +1366,20 @@ function finImpresion() {
 
 function vistaInforme() {
   if (!ALCANCES.find(x => x.id === ST.infScope)) ST.infScope = 'general';
-  if (!PER_INF.find(x => x.id === ST.perInf)) ST.perInf = 'u30';
+  if (!PER_INF.find(x => x.id === ST.perInf)) ST.perInf = 'rango';
   const r = construirInforme(ST.infScope, ST.perInf, 'pv');
   app().innerHTML = `<section class="vista">
     <div class="hero no-print"><div><div class="eyebrow">Reportes para producción</div><h1>Informes <span>imprimibles</span></h1><p class="sub">Elegí el alcance y el período; la vista previa es lo que sale impreso en A4.</p></div>
       <div class="hero-acc">${btnGlosario()}<button class="btn pri" id="btnImprimir">🖨️ Imprimir o guardar PDF</button></div></div>
     <div class="inf-ctrl no-print"><div class="seg" id="segScope">${ALCANCES.map(x => `<button data-s="${x.id}" class="${x.id === ST.infScope ? 'on' : ''}"><span>${x.e}</span>${x.n}</button>`).join('')}</div>
       <div class="seg" id="segInf">${PER_INF.map(x => `<button data-per="${x.id}" class="${x.id === ST.perInf ? 'on' : ''}"><span>${x.e}</span>${x.n}</button>`).join('')}</div></div>
+    ${ST.perInf === 'rango' ? controlRangoHtml() : ''}
     <div id="inf">${r.html}</div></section>`;
   $('segScope').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.infScope = b.dataset.s; vistaInforme(); }; });
   $('segInf').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.perInf = b.dataset.per; vistaInforme(); }; });
   requestAnimationFrame(() => { moverPill($('segScope')); moverPill($('segInf')); });
   $('btnImprimir').onclick = () => imprimir(ST.infScope, ST.perInf);
+  ligarRango(vistaInforme);
   ST.cvEl = $('inf').querySelector('.informe');
   r.dibujar();
   ST.cvEl = null;
@@ -1432,7 +1464,7 @@ function aplicar(d, desdeCache) {
 }
 
 function init() {
-  ST.per = LS.get('ic_per', 'hist');
+  ST.per = LS.get('ic_per2', 'rango');
   $('btnTema').innerHTML = icoTema(); $('btnRefrescar').innerHTML = ICO.refrescar;
   $('btnTema').onclick = alternarTema;
   $('btnRefrescar').onclick = () => cargar(true, true);
@@ -1447,7 +1479,7 @@ function init() {
     const g = e.target.closest('[data-glosario]');
     if (g) { e.preventDefault(); abrirGlosario(); return; }
     const p = e.target.closest('[data-imprimir]');
-    if (p) { e.preventDefault(); const sc = p.dataset.imprimir; imprimir(sc, sc === 'general' ? (ST.perInf || 'u30') : ST.per); return; }
+    if (p) { e.preventDefault(); const sc = p.dataset.imprimir; imprimir(sc, sc === 'general' ? (ST.perInf || 'rango') : ST.per); return; }
     if (!e.target.closest('#pop')) cerrarAyuda();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { cerrarAyuda(); if (document.body.classList.contains('modo-ayuda')) alternarModoAyuda(false); } });

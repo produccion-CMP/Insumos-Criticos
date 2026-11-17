@@ -883,3 +883,11 @@ tr.tenue td { color: var(--faint); font-size: .8rem; }
 #lUsrCampo select, #lUsrCampo input { width: 100%; }
 
 .snippet { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 600 .78rem/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; margin: 10px 0 0; }
+
+.rango-ctrl { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--line); }
+.rango-ctrl .rg-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 220px; }
+.rango-ctrl .rg-chips button { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; transition: all .2s; }
+.rango-ctrl .rg-chips button:hover { color: var(--text); }
+.rango-ctrl .rg-chips button.on { background: var(--text); color: var(--panel); border-color: var(--text); }
+.rango-ctrl label.f { width: 150px; }
+@media (max-width: 640px) { .rango-ctrl label.f { width: calc(50% - 5px); } }
