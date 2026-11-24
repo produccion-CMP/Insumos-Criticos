@@ -32,6 +32,8 @@ const BNAV = [
 ];
 const ADMIN_SEC = [
   { id: 'registrar', e: '➕', n: 'Registrar', admin: false, reg: true },
+  { id: 'avisar', e: '📣', n: 'Avisar', admin: false, sup: true },
+  { id: 'avisos', e: '📬', n: 'Avisos', admin: true },
   { id: 'reposicion', e: '🛒', n: 'Reposición', admin: true },
   { id: 'usuarios', e: '👥', n: 'Usuarios', admin: true },
   { id: 'conexion', e: '🔌', n: 'Conexión', admin: true },
@@ -105,12 +107,16 @@ function moverPill(cont) {
   pill.style.width = on.offsetWidth + 'px';
 }
 
+const vistasVisibles = () => VISTAS.filter(x => !(x.id === 'informe' || x.id === 'movimientos') || verReportes());
+const bnavVisibles = () => BNAV.filter(x => !(x.id === 'informe' || x.id === 'movimientos') || verReportes());
+
 function pintarNav() {
   const v = ST.vista;
+  const VIS = vistasVisibles();
   const prev = $('nav').querySelector('.pill');
   const pl = prev ? prev.style.left : '', pw = prev ? prev.style.width : '';
-  $('nav').innerHTML = VISTAS.map((x, i) => (x.der && !VISTAS[i - 1].der ? '<span class="nav-sep"></span>' : '') + `<a href="#/${x.id}" class="${x.id === v ? 'on' : ''}${x.der ? ' der' : ''}">${INSUMOS[x.id] ? `<span class="nav-ic" style="--c2:var(--c-${x.id}-2)">${INSUMOS[x.id].ico}</span>` : ''}${x.n}</a>`).join('');
-  $('bnav').innerHTML = BNAV.map(x => {
+  $('nav').innerHTML = VIS.map((x, i) => (x.der && !VIS[i - 1].der ? '<span class="nav-sep"></span>' : '') + `<a href="#/${x.id}" class="${x.id === v ? 'on' : ''}${x.der ? ' der' : ''}">${INSUMOS[x.id] ? `<span class="nav-ic" style="--c2:var(--c-${x.id}-2)">${INSUMOS[x.id].ico}</span>` : ''}${x.n}</a>`).join('');
+  $('bnav').innerHTML = bnavVisibles().map(x => {
     const act = x.id === 'insumo' ? INSUMOS[v] : x.id === v;
     const href = x.id === 'insumo' ? '#/' + ST.insumo : '#/' + x.id;
     return `<a href="${href}" class="${act ? 'on' : ''}"><span class="e">${x.id === 'insumo' && INSUMOS[ST.insumo] ? INSUMOS[ST.insumo].ico : x.e}</span>${x.n}</a>`;
@@ -385,6 +391,7 @@ const AYUDA = {
 const GLOSARIO = [
   ['SS', 'Stock de seguridad: mínimo para no quedarse sin insumo mientras llega el pedido.'],
   ['PP', 'Punto de pedido: stock en el que hay que lanzar la compra.'],
+  ['Máx', 'Stock máximo: nivel hasta el que se completa cada pedido, definido por el administrador.'],
   ['Cobertura', 'Días que alcanza el stock al consumo medio.'],
   ['Consumo medio', 'Mediana de los días con consumo de 120 días (tarimas y stretch) o promedio diario calendario de 21 días (cal) y 90 días (gasoil).'],
   ['u', 'Unidades (tarimas).'], ['kg', 'Kilogramos (stretch).'], ['bob.', 'Bobinas de stretch (15 kg cada una por defecto).'], ['L', 'Litros (gasoil).'],
@@ -531,7 +538,7 @@ function vistaInsumo(id) {
         <div class="datos"><span class="grande">${fmt(x.stock)} <small>${u}</small></span>
           <span class="tag est-tag">${ESTADO[x.estado]}</span>
           <span class="cob">⏳ <b>${fmt(x.cobertura, 1)}</b> días</span>
-          <span class="sub">Consumo medio ${fmt(x.medio, dec)} ${u}/día · PP ${fmt(x.pp)} · SS ${fmt(x.ss)} · último control ${ctrl ? fFecha(ctrl.f) : '—'}</span></div></div>
+          <span class="sub">Consumo medio ${fmt(x.medio, dec)} ${u}/día · PP ${fmt(x.pp)} · SS ${fmt(x.ss)}${x.stockMax ? ' · Máx ' + fmt(x.stockMax) : ''} · último control ${ctrl ? fFecha(ctrl.f) : '—'}</span></div></div>
       ${ilus(id, x.stock, x)}
     </div>
     <div class="barra-per"><div class="seg" id="segPer">${segP}</div><div class="hero-acc">${btnGlosario()}${btnImprimir(id, 'Imprimir informe de ' + I.nombre)}</div></div>${ST.per === 'rango' ? controlRangoHtml() : ''}<p class="rango">🗓️ ${rango}</p>
@@ -558,7 +565,7 @@ function vistaInsumo(id) {
         backgroundColor: ctx => { const { ctx: g, chartArea: a } = ctx.chart; if (!a) return alfa(ci, .15); const gr = g.createLinearGradient(0, a.top, 0, a.bottom); gr.addColorStop(0, alfa(ci, .35)); gr.addColorStop(1, alfa(ci, .02)); return gr; } },
       { label: 'Punto de pedido', data: s.map(() => x.pp), borderColor: cv('--warn'), borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
       { label: 'Stock de seguridad', data: s.map(() => x.ss), borderColor: cv('--bad'), borderDash: [3, 3], borderWidth: 1.5, pointRadius: 0 }
-    ] },
+    ].concat(x.stockMax ? [{ label: 'Stock máximo', data: s.map(() => x.stockMax), borderColor: cv('--ok'), borderDash: [10, 4], borderWidth: 1.5, pointRadius: 0 }] : []) },
     options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { title: c => fFecha(s[c[0].dataIndex].f), label: c => c.dataset.label + ': ' + fmt(c.parsed.y, dec) + ' ' + u } } }, scales: { x: Object.assign(ejeX(), { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } }), y: ejeY(0) } }
   });
   const men = mensual(id);
@@ -943,7 +950,7 @@ function filtrarMov() {
 
 function vistaReposicion() {
   const M = ST.modelo;
-  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Método estadístico: SS = z·σ·√LT + consumo·(LT máx − LT) · PP = consumo·LT + SS · Nivel máximo = PP + consumo·ciclo · Pedir = nivel máximo − stock. Los valores teóricos se calculan al instante; «Aplicar» los copia a los días de SS y PP vigentes.</p>
+  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Método estadístico: SS = z·σ·√LT + consumo·(LT máx − LT) · PP = consumo·LT + SS · Stock máximo = el que definas (vacío: PP + consumo·ciclo) · Pedir = stock máximo − stock. Los valores se calculan al instante; «Aplicar» los copia a los días de SS y PP vigentes.</p>
     <div class="param-grid stagger">${ORDEN.map((id, i) => {
       const x = M[id], I = INSUMOS[id], e = x.est;
       const num = (k, v, st) => `<input type="number" min="0" step="${st}" value="${v === null || v === undefined ? '' : v}" data-e="${k}" inputmode="decimal">`;
@@ -955,6 +962,7 @@ function vistaReposicion() {
           <label class="f">Lead time máximo (días)${num('ltMax', e.ltMax, 0.5)}</label>
           <label class="f">Nivel de servicio (%)${num('nivel', e.nivel, 0.1)}</label>
           <label class="f">Ciclo de pedido (días)${num('ciclo', e.ciclo, 1)}</label>
+          <label class="f full">Stock máximo (${I.u}) · vacío = teórico${num('max', x.stockMax, 1)}</label>
         </div>
         <div class="teo" data-teo></div>
         <div class="acciones" style="margin:0"><button class="btn pri" data-guardar-est="${id}">💾 Guardar parámetros</button><button class="btn" data-aplicar="${id}" type="button">Aplicar a SS y PP</button></div>
@@ -973,7 +981,7 @@ function vistaReposicion() {
       ['SS', 'PP'].forEach(k => { card.querySelector(`[data-o="${k}"]`).textContent = x.medio ? fmt(Math.ceil((+D(k).value || 0) * x.medio)) : '—'; });
     };
     const teo = () => {
-      T = teorico(x.medio, x.sigma, E('ltN'), E('ltMax'), E('nivel'), E('ciclo'), x.stock);
+      T = teorico(x.medio, x.sigma, E('ltN'), E('ltMax'), E('nivel'), E('ciclo'), x.stock, E('max'));
       const box = card.querySelector('[data-teo]');
       if (!T) { box.innerHTML = '<p class="nota">Completá lead time normal y máximo (máximo ≥ normal), nivel de servicio entre 50 y 99,99 % y ciclo de pedido para ver el cálculo.</p>'; return; }
       const f = v => fmt(Math.ceil(v));
@@ -982,8 +990,8 @@ function vistaReposicion() {
         <div><span>z (${fmt(E('nivel'), 1)} %)</span><b>${fmt(T.z, 2)}</b></div>
         <div><span>SS teórico</span><b>${f(T.ss)}</b>${vs('', x.ss)}<small>${fmt(T.diasSS, 1)} días</small></div>
         <div><span>PP teórico</span><b>${f(T.pp)}</b>${vs('', x.pp)}<small>${fmt(T.diasPP, 1)} días</small></div>
-        <div><span>Nivel máximo</span><b>${f(T.maxN)}</b><small>${I.u}</small></div>
-        <div class="dest ${T.pedir > 0 ? (x.stock !== null && x.stock <= T.pp ? 'bad' : 'warn') : 'ok'}"><span>Pedir hoy</span><b>${f(T.pedir)} ${I.u}</b><small>${x.stock !== null && x.stock <= T.pp ? 'stock en o bajo el PP: pedir ya' : 'stock sobre el PP'}</small></div></div>
+        <div><span>Stock máximo ${T.maxDef ? '(definido)' : '(teórico)'}</span><b>${f(T.maxN)}</b><small>${T.maxDef ? 'teórico ' + f(T.maxT) + ' ' + I.u : I.u}</small></div>
+        <div class="dest ${x.stock !== null && x.stock <= T.pp ? 'bad' : 'ok'}"><span>Pedir hoy</span><b>${x.stock !== null && x.stock <= T.pp ? f(T.pedir) : '0'} ${I.u}</b><small>${x.stock !== null && x.stock <= T.pp ? 'stock en o bajo el PP: pedir ya hasta el máximo' : 'stock sobre el PP · al llegar al PP pedir ' + f(Math.max(0, T.maxN - T.pp)) + ' ' + I.u}</small></div></div>
         <p class="nota">Protección por variabilidad ${f(T.ssVar)} + protección por demora máxima ${f(T.ssDem)} ${I.u}. Stock actual ${fmt(x.stock)} ${I.u}.</p>`;
     };
     card.querySelectorAll('[data-paso]').forEach(b => { b.onclick = () => { const inp = D(b.dataset.k); inp.value = Math.max(1, (+inp.value || 0) + +b.dataset.paso); recalc(); }; });
@@ -998,11 +1006,11 @@ function vistaReposicion() {
     };
     card.querySelector('[data-guardar-est]').onclick = async ev => {
       const b = ev.currentTarget;
-      if (E('ltN') === null || E('ltMax') === null || E('nivel') === null || E('ciclo') === null) { toast('Completá los cuatro parámetros', 'warn'); return; }
+      if (E('ltN') === null || E('ltMax') === null || E('nivel') === null || E('ciclo') === null) { toast('Completá lead times, nivel de servicio y ciclo', 'warn'); return; }
       b.disabled = true;
       guardando(true, 'Guardando parámetros…');
       try {
-        toast(await apiPost({ accion: 'parametros', insumo: id, ltNormal: E('ltN'), ltMax: E('ltMax'), nivelServicio: E('nivel'), ciclo: E('ciclo') }), 'ok');
+        toast(await apiPost({ accion: 'parametros', insumo: id, ltNormal: E('ltN'), ltMax: E('ltMax'), nivelServicio: E('nivel'), ciclo: E('ciclo'), stockMax: E('max') === null ? '' : E('max') }), 'ok');
         await cargar(true);
       } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
     };
@@ -1014,6 +1022,58 @@ function vistaReposicion() {
         toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +D('SS').value, diasPP: +D('PP').value }), 'ok');
         await cargar(true);
       } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
+    };
+  });
+}
+
+function vistaAvisar() {
+  $('adm').innerHTML = `<div class="card"><div class="card-h"><div class="t"><h3>📣 Avisar al administrador</h3><span class="sub">Informá un problema, un faltante o cualquier novedad sobre un insumo. Solo lo ve el administrador.</span></div></div>
+    <form class="form" id="formAviso" autocomplete="off">
+      <label class="f">Insumo<select id="avIns">${['General'].concat(ORDEN.map(i => INSUMOS[i].nombre)).map(n => `<option>${n}</option>`).join('')}</select></label>
+      <label class="f">Tipo<select id="avTipo"><option>Observación</option><option>Problema</option><option>Faltante</option><option>Urgente</option></select></label>
+      <label class="f full">Mensaje<textarea id="avMsg" rows="4" maxlength="1000" required placeholder="Describí qué ocurre, dónde y desde cuándo"></textarea></label>
+      <div class="full acciones" style="margin-top:0"><button class="btn pri" type="submit">📨 Enviar aviso</button></div></form></div>`;
+  $('formAviso').onsubmit = async e => {
+    e.preventDefault();
+    const b = e.submitter || e.target.querySelector('button[type=submit]');
+    b.disabled = true;
+    guardando(true, 'Enviando aviso…');
+    try {
+      toast(await apiPost({ accion: 'aviso', insumo: $('avIns').value, tipo: $('avTipo').value, mensaje: $('avMsg').value }), 'ok');
+      $('avMsg').value = '';
+    } catch (err) { toast(err.message, 'bad'); } finally { guardando(false); b.disabled = false; }
+  };
+}
+
+async function vistaAvisos() {
+  $('adm').innerHTML = '<div class="card"><div class="empty"><span class="spin"></span> Cargando avisos…</div></div>';
+  let l;
+  try { l = await apiPost({ accion: 'listaAvisos' }); } catch (err) { $('adm').innerHTML = `<div class="card"><div class="empty">${esc(err.message)}</div></div>`; return; }
+  ST.avisos = l.avisos || l;
+  pintarAvisos();
+}
+
+function pintarAvisos() {
+  const todos = ST.avisos || [];
+  const f = ST.avFiltro || 'Pendiente';
+  const l = f === 'todos' ? todos : todos.filter(x => x.estado === f);
+  const pend = todos.filter(x => x.estado === 'Pendiente').length;
+  const ico = { Problema: '🛠️', Faltante: '📉', Urgente: '🚨', 'Observación': '📝' };
+  $('adm').innerHTML = `<div class="card"><div class="card-h"><div class="t"><h3>📬 Avisos de supervisores</h3><span class="sub">${pend} pendiente${pend === 1 ? '' : 's'} · ${todos.length} en total (últimos 300)</span></div>
+    <div class="seg" id="segAv">${[['Pendiente', 'Pendientes'], ['Resuelto', 'Resueltos'], ['todos', 'Todos']].map(([k, n]) => `<button data-f="${k}" class="${k === f ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    <div class="mov-lista">${l.length ? l.map(x => `<div class="mov"><span class="e">${ico[x.tipo] || '📝'}</span><div class="t"><b>${esc(x.tipo)} · ${esc(x.insumo)}</b><div class="sub">${esc(x.fecha)} · ${esc(x.nombre || x.usuario)}${x.estado === 'Resuelto' ? ' · resuelto por ' + esc(x.resueltoPor) + ' el ' + esc(x.resuelto) : ''}</div><p style="margin:6px 0 0;white-space:pre-wrap">${esc(x.mensaje)}</p></div>
+      <button class="btn sm ${x.estado === 'Resuelto' ? '' : 'pri'}" data-av="${x.fila}" data-e="${x.estado === 'Resuelto' ? 'Pendiente' : 'Resuelto'}">${x.estado === 'Resuelto' ? 'Reabrir' : 'Marcar resuelto'}</button></div>`).join('') : '<div class="empty">Sin avisos en esta vista</div>'}</div></div>`;
+  $('segAv').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.avFiltro = b.dataset.f; pintarAvisos(); }; });
+  requestAnimationFrame(() => moverPill($('segAv')));
+  $('adm').querySelectorAll('[data-av]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        toast(await apiPost({ accion: 'estadoAviso', fila: +b.dataset.av, estado: b.dataset.e }), 'ok');
+        const x = ST.avisos.find(y => y.fila === +b.dataset.av);
+        if (x) x.estado = b.dataset.e;
+        pintarAvisos();
+      } catch (err) { toast(err.message, 'bad'); b.disabled = false; }
     };
   });
 }
@@ -1120,8 +1180,8 @@ async function cargarListaUsuarios() {
 function vistaAdmin() {
   const s = sesion();
   if (!s) { vistaLogin(); return; }
-  const secs = ADMIN_SEC.filter(x => (!x.admin || esAdmin()) && (!x.reg || puedeRegistrar()));
-  if (!secs.find(x => x.id === ST.admSec)) ST.admSec = puedeRegistrar() ? 'registrar' : 'cuenta';
+  const secs = ADMIN_SEC.filter(x => (!x.admin || esAdmin()) && (!x.reg || puedeRegistrar()) && (!x.sup || puedeAvisar()));
+  if (!secs.find(x => x.id === ST.admSec)) ST.admSec = puedeRegistrar() ? 'registrar' : puedeAvisar() ? 'avisar' : 'cuenta';
   const rolTxt = (ROL_TXT[s.rol] || s.rol) + (s.rol === 'operador' && s.verInventario ? ' · ve inventarios' : '');
   app().innerHTML = `<section class="vista">
     <div class="hero"><div><div class="eyebrow">👤 ${esc(s.nombre || s.usuario)} · ${rolTxt}</div><h1>Admini<span>stración</span></h1><p class="sub">Todo lo que modifica las planillas está acá. Cada acción queda registrada con tu usuario.</p></div>
@@ -1129,7 +1189,7 @@ function vistaAdmin() {
     <div id="adm"></div></section>`;
   $('segAdm').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.admSec = b.dataset.sec; vistaAdmin(); }; });
   requestAnimationFrame(() => moverPill($('segAdm')));
-  const v = { registrar: vistaRegistrar, reposicion: vistaReposicion, usuarios: vistaUsuarios, conexion: vistaConexion, cuenta: vistaCuenta }[ST.admSec];
+  const v = { registrar: vistaRegistrar, avisar: vistaAvisar, avisos: vistaAvisos, reposicion: vistaReposicion, usuarios: vistaUsuarios, conexion: vistaConexion, cuenta: vistaCuenta }[ST.admSec];
   v();
 }
 
@@ -1149,7 +1209,7 @@ function pintarUsuarios() {
   const yo = sesion().usuario;
   $('listaU').innerHTML = `<div class="tabla-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Ver inventarios</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead><tbody>${ST.usuarios.map((u, i) => `<tr class="${u.activo ? '' : 'inactivo'}">
       <td><b>${esc(u.nombre || u.usuario)}</b><br><small class="muted">${esc(u.usuario)}${u.usuario === yo ? ' · vos' : ''}</small></td>
-      <td><span class="tag ${u.rol === 'admin' ? 't-acc' : u.rol === 'compras' ? 't-info' : 't-mut'}">${{ admin: '🛡️', compras: '🛒', operador: '🧰' }[u.rol] || ''} ${ROL_TXT[u.rol] || u.rol}</span></td>
+      <td><span class="tag ${u.rol === 'admin' ? 't-acc' : (u.rol === 'compras' || u.rol === 'supervisor') ? 't-info' : 't-mut'}">${{ admin: '🛡️', compras: '🛒', operador: '🧰', supervisor: '📋' }[u.rol] || ''} ${ROL_TXT[u.rol] || u.rol}</span></td>
       <td>${u.rol !== 'operador' ? '<span class="muted">Siempre</span>' : `<label class="switch"><input type="checkbox" data-inv="${i}" ${u.verInventario ? 'checked' : ''}><span></span></label>`}</td>
       <td>${u.activo ? '🟢 Activo' : '⚪ Inactivo'}</td>
       <td><small>${esc(u.ultimo || '—')}</small></td>
@@ -1174,7 +1234,7 @@ function formUsuario(u) {
     <form class="form" id="formU" autocomplete="off">
       <label class="f">Usuario<input id="uId" type="text" maxlength="40" required autocapitalize="none" spellcheck="false" placeholder="ej. jperez" value="${esc(u.usuario)}" ${nuevo ? '' : 'readonly'}></label>
       <label class="f">Nombre y apellido<input id="uNom" type="text" maxlength="60" required value="${esc(u.nombre || '')}"></label>
-      <label class="f">Rol<select id="uRol"><option value="operador" ${u.rol === 'operador' ? 'selected' : ''}>🧰 Operador · registra movimientos</option><option value="compras" ${u.rol === 'compras' ? 'selected' : ''}>🛒 Responsable de Compras · informes, movimientos e inventarios</option><option value="admin" ${u.rol === 'admin' ? 'selected' : ''}>🛡️ Administrador · todo</option></select></label>
+      <label class="f">Rol<select id="uRol"><option value="operador" ${u.rol === 'operador' ? 'selected' : ''}>🧰 Operador · registra movimientos</option><option value="compras" ${u.rol === 'compras' ? 'selected' : ''}>🛒 Responsable de Compras · informes, movimientos e inventarios</option><option value="supervisor" ${u.rol === 'supervisor' ? 'selected' : ''}>📋 Supervisor · informes, movimientos y avisos al administrador</option><option value="admin" ${u.rol === 'admin' ? 'selected' : ''}>🛡️ Administrador · todo</option></select></label>
       <label class="f">${nuevo ? 'Clave inicial' : 'Nueva clave'}<input id="uClave" type="password" minlength="6" ${nuevo ? 'required' : ''} autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label>
       <label class="chk full"><input type="checkbox" id="uInv" ${u.verInventario || u.rol !== 'operador' ? 'checked' : ''}> <span>📋 Puede ver inventarios físicos vs. sistema</span></label>
       <label class="chk full"><input type="checkbox" id="uAct" ${u.activo ? 'checked' : ''}> <span>🟢 Usuario activo (desmarcá para bloquear el acceso)</span></label>

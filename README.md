@@ -126,3 +126,11 @@ En Administración › Reposición, por insumo: consumo medio, σ diaria, lead t
 - Pedir = nivel máximo − stock actual (mínimo 0)
 
 «Guardar parámetros» escribe en la hoja Necesidades, columnas I a L (encabezados automáticos). «Aplicar a SS y PP» copia el teórico a los días vigentes, que se guardan aparte. Requiere volver a publicar Code.gs.
+
+## Roles, avisos y stock máximo (v9)
+
+- **Lectores (sin sesión):** ven Inicio y los insumos. No ven Informes ni Movimientos, y no tienen botones de impresión o descarga.
+- **Con usuario y clave:** Informes (imprimir o guardar como PDF) y Movimientos.
+- **Supervisor (nuevo):** Informes, Movimientos y la sección Administración › Avisar, para informar problemas, faltantes, urgencias u observaciones. Solo el administrador las ve.
+- **Administrador:** Administración › Avisos (pendientes, resueltos, marcar como resuelto) y Reposición con **stock máximo** editable por insumo (vacío = teórico).
+- Hoja nueva «AvisosApp» (se crea sola). Stock máximo en Necesidades, columna M. Hay que volver a publicar Code.gs.

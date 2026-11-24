@@ -61,11 +61,12 @@ function sesion() {
   const s = LS.get('ic_ses', null);
   return s && s.token && s.vence > Date.now() ? s : null;
 }
-const ROL_TXT = { admin: 'Administrador', operador: 'Operador', compras: 'Responsable de Compras' };
+const ROL_TXT = { admin: 'Administrador', operador: 'Operador', compras: 'Responsable de Compras', supervisor: 'Supervisor' };
 const esAdmin = () => { const s = sesion(); return !!(s && s.rol === 'admin'); };
 const puedeRegistrar = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.rol === 'operador')); };
 const verInventario = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.rol === 'compras' || s.verInventario)); };
 const verReportes = () => !!sesion();
+const puedeAvisar = () => { const s = sesion(); return !!(s && s.rol === 'supervisor'); };
 
 async function apiPost(payload) {
   const { url, key } = conexion();
@@ -139,6 +140,7 @@ function construirModelo(D) {
     ins.diasSS = nec && nec.diasSS ? nec.diasSS : INSUMOS[id].defSS;
     ins.diasPP = nec && nec.diasPP ? nec.diasPP : INSUMOS[id].defPP;
     ins.paramGuardado = !!(nec && nec.diasSS && nec.diasPP);
+    ins.stockMax = nec && nec.stockMax ? nec.stockMax : null;
     ins.est = { ltN: nec && nec.ltNormal ? nec.ltNormal : null, ltMax: nec && nec.ltMax ? nec.ltMax : null, nivel: nec && nec.nivelServicio ? nec.nivelServicio : 95, ciclo: nec && nec.ciclo ? nec.ciclo : 7, guardado: !!(nec && nec.ltNormal && nec.ltMax) };
     ins.sigma = sigmaConsumo(id, ins, hoy);
     ins.ss = ins.medio !== null ? Math.ceil(ins.diasSS * ins.medio) : null;
@@ -197,16 +199,17 @@ function zNormal(p) {
   return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
 }
 
-function teorico(medio, sigma, ltN, ltMax, nivel, ciclo, stock) {
+function teorico(medio, sigma, ltN, ltMax, nivel, ciclo, stock, stockMax) {
   if (!(medio > 0) || sigma === null || !(ltN > 0) || !(ltMax >= ltN) || !(nivel >= 50 && nivel < 100) || !(ciclo > 0)) return null;
   const z = zNormal(nivel / 100);
   const ssVar = z * sigma * Math.sqrt(ltN);
   const ssDem = medio * (ltMax - ltN);
   const ss = ssVar + ssDem;
   const pp = medio * ltN + ss;
-  const maxN = pp + medio * ciclo;
+  const maxT = pp + medio * ciclo;
+  const maxN = stockMax && stockMax > 0 ? stockMax : maxT;
   const pedir = stock === null || stock === undefined ? null : Math.max(0, maxN - stock);
-  return { z, ssVar, ssDem, ss, pp, maxN, pedir, diasSS: ss / medio, diasPP: pp / medio };
+  return { z, ssVar, ssDem, ss, pp, maxN, maxT, maxDef: !!(stockMax && stockMax > 0), pedir, diasSS: ss / medio, diasPP: pp / medio };
 }
 
 function periodos(fin, inicio) {
