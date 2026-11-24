@@ -114,3 +114,15 @@ Las columnas calculadas de las hojas `StockDiario*` (ingresos, envíos, consumos
 - El filtro aparece en el detalle de cada insumo (pestaña «Rango»), en Informes y en Movimientos.
 - Opciones rápidas: 7, 14, 30 y 90 días, mes en curso y todo el historial; o fechas «Desde» y «Hasta» a elección.
 - La elección se recuerda en cada navegador. Los indicadores se comparan contra el período inmediato anterior de igual duración.
+
+## Reposición estadística (v8, solo Administrador)
+
+En Administración › Reposición, por insumo: consumo medio, σ diaria, lead time normal y máximo, nivel de servicio y ciclo de pedido.
+
+- z = inversa de la normal del nivel de servicio
+- SS = z · σ · √LT + consumo · (LT máx − LT)
+- PP = consumo · LT + SS
+- Nivel máximo = PP + consumo · ciclo
+- Pedir = nivel máximo − stock actual (mínimo 0)
+
+«Guardar parámetros» escribe en la hoja Necesidades, columnas I a L (encabezados automáticos). «Aplicar a SS y PP» copia el teórico a los días vigentes, que se guardan aparte. Requiere volver a publicar Code.gs.

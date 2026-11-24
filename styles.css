@@ -891,3 +891,19 @@ tr.tenue td { color: var(--faint); font-size: .8rem; }
 .rango-ctrl .rg-chips button.on { background: var(--text); color: var(--panel); border-color: var(--text); }
 .rango-ctrl label.f { width: 150px; }
 @media (max-width: 640px) { .rango-ctrl label.f { width: calc(50% - 5px); } }
+
+.param-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.calc.c2 { grid-template-columns: repeat(2, 1fr); }
+.calc small { display: block; color: var(--muted); font-size: .68rem; font-weight: 600; }
+.est-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.teo-g { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.teo-g > div { padding: 9px 10px; border-radius: 12px; background: var(--panel-2); display: flex; flex-direction: column; gap: 2px; }
+.teo-g span { font-size: .7rem; font-weight: 800; color: var(--muted); }
+.teo-g b { font-size: 1.15rem; }
+.teo-g small { color: var(--muted); font-size: .68rem; font-weight: 600; }
+.teo-g .dest { grid-column: 1 / -1; border: 1.5px solid var(--line); }
+.teo-g .dest.ok { border-color: var(--ok); }
+.teo-g .dest.warn { border-color: var(--warn); }
+.teo-g .dest.bad { border-color: var(--bad); }
+.vigente summary { cursor: pointer; font-size: .8rem; font-weight: 800; color: var(--muted); margin-bottom: 8px; }
+.vigente > * { margin-top: 8px; }

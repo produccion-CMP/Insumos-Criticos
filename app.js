@@ -943,29 +943,75 @@ function filtrarMov() {
 
 function vistaReposicion() {
   const M = ST.modelo;
-  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Stock de seguridad = días SS × consumo medio · Punto de pedido = días PP × consumo medio. Se guardan en la hoja «Necesidades».</p>
+  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Método estadístico: SS = z·σ·√LT + consumo·(LT máx − LT) · PP = consumo·LT + SS · Nivel máximo = PP + consumo·ciclo · Pedir = nivel máximo − stock. Los valores teóricos se calculan al instante; «Aplicar» los copia a los días de SS y PP vigentes.</p>
     <div class="param-grid stagger">${ORDEN.map((id, i) => {
-      const x = M[id], I = INSUMOS[id];
+      const x = M[id], I = INSUMOS[id], e = x.est;
+      const num = (k, v, st) => `<input type="number" min="0" step="${st}" value="${v === null || v === undefined ? '' : v}" data-e="${k}" inputmode="decimal">`;
       return `<div class="card param" style="--c:var(--c-${id});--c2:var(--c-${id}-2);--i:${i}" data-id="${id}">
-        <div class="ins-cab"><span class="ins-ico">${I.ico}</span><div><h3>${I.nombre}</h3><div class="sub">Consumo medio ${fmt(x.medio, I.dec)} ${I.u}/día</div></div>${x.paramGuardado ? '' : '<span class="tag t-mut">por defecto</span>'}</div>
+        <div class="ins-cab"><span class="ins-ico">${I.ico}</span><div><h3>${I.nombre}</h3><div class="sub">Datos de los últimos ${I.medio.dias} días</div></div>${x.paramGuardado ? '' : '<span class="tag t-mut">por defecto</span>'}</div>
+        <div class="calc c2"><div><span>Consumo medio</span><b>${fmt(x.medio, I.dec)}</b><small>${I.u}/día</small></div><div><span>σ diaria</span><b>${fmt(x.sigma, I.dec)}</b><small>${I.u}/día</small></div></div>
+        <div class="est-grid">
+          <label class="f">Lead time normal (días)${num('ltN', e.ltN, 0.5)}</label>
+          <label class="f">Lead time máximo (días)${num('ltMax', e.ltMax, 0.5)}</label>
+          <label class="f">Nivel de servicio (%)${num('nivel', e.nivel, 0.1)}</label>
+          <label class="f">Ciclo de pedido (días)${num('ciclo', e.ciclo, 1)}</label>
+        </div>
+        <div class="teo" data-teo></div>
+        <div class="acciones" style="margin:0"><button class="btn pri" data-guardar-est="${id}">💾 Guardar parámetros</button><button class="btn" data-aplicar="${id}" type="button">Aplicar a SS y PP</button></div>
+        <details class="vigente"><summary>Valores vigentes (en días de consumo)</summary>
         ${['SS', 'PP'].map(k => `<div class="stepper-fila"><div class="l">${k === 'SS' ? '🛡️ Stock de seguridad' : '🛒 Punto de pedido'}<small>días de consumo</small></div>
           <div class="stepper"><button type="button" data-paso="-1" data-k="${k}">−</button><input type="number" min="1" step="1" value="${k === 'SS' ? x.diasSS : x.diasPP}" data-k="${k}"><button type="button" data-paso="1" data-k="${k}">+</button></div></div>`).join('')}
         <div class="calc"><div><span>SS</span><b data-o="SS">${fmt(x.ss)}</b></div><div><span>PP</span><b data-o="PP">${fmt(x.pp)}</b></div><div><span>Stock</span><b>${fmt(x.stock)}</b></div></div>
-        <button class="btn pri" data-guardar="${id}">💾 Guardar</button></div>`;
+        <button class="btn" data-guardar="${id}">💾 Guardar días vigentes</button></details></div>`;
     }).join('')}</div>`;
   $('adm').querySelectorAll('.param').forEach(card => {
-    const id = card.dataset.id, x = M[id];
+    const id = card.dataset.id, x = M[id], I = INSUMOS[id];
+    const E = k => { const v = card.querySelector(`[data-e="${k}"]`).value; return v === '' ? null : +v; };
+    const D = k => card.querySelector(`input[data-k="${k}"]`);
+    let T = null;
     const recalc = () => {
-      ['SS', 'PP'].forEach(k => { const v = +card.querySelector(`input[data-k="${k}"]`).value; card.querySelector(`[data-o="${k}"]`).textContent = x.medio ? fmt(Math.ceil(v * x.medio)) : '—'; });
+      ['SS', 'PP'].forEach(k => { card.querySelector(`[data-o="${k}"]`).textContent = x.medio ? fmt(Math.ceil((+D(k).value || 0) * x.medio)) : '—'; });
     };
-    card.querySelectorAll('[data-paso]').forEach(b => { b.onclick = () => { const inp = card.querySelector(`input[data-k="${b.dataset.k}"]`); inp.value = Math.max(1, (+inp.value || 0) + +b.dataset.paso); recalc(); }; });
-    card.querySelectorAll('input').forEach(i => { i.oninput = recalc; });
+    const teo = () => {
+      T = teorico(x.medio, x.sigma, E('ltN'), E('ltMax'), E('nivel'), E('ciclo'), x.stock);
+      const box = card.querySelector('[data-teo]');
+      if (!T) { box.innerHTML = '<p class="nota">Completá lead time normal y máximo (máximo ≥ normal), nivel de servicio entre 50 y 99,99 % y ciclo de pedido para ver el cálculo.</p>'; return; }
+      const f = v => fmt(Math.ceil(v));
+      const vs = (t, v) => v === null || v === undefined ? '' : `<small>vigente ${fmt(v)}</small>`;
+      box.innerHTML = `<div class="teo-g">
+        <div><span>z (${fmt(E('nivel'), 1)} %)</span><b>${fmt(T.z, 2)}</b></div>
+        <div><span>SS teórico</span><b>${f(T.ss)}</b>${vs('', x.ss)}<small>${fmt(T.diasSS, 1)} días</small></div>
+        <div><span>PP teórico</span><b>${f(T.pp)}</b>${vs('', x.pp)}<small>${fmt(T.diasPP, 1)} días</small></div>
+        <div><span>Nivel máximo</span><b>${f(T.maxN)}</b><small>${I.u}</small></div>
+        <div class="dest ${T.pedir > 0 ? (x.stock !== null && x.stock <= T.pp ? 'bad' : 'warn') : 'ok'}"><span>Pedir hoy</span><b>${f(T.pedir)} ${I.u}</b><small>${x.stock !== null && x.stock <= T.pp ? 'stock en o bajo el PP: pedir ya' : 'stock sobre el PP'}</small></div></div>
+        <p class="nota">Protección por variabilidad ${f(T.ssVar)} + protección por demora máxima ${f(T.ssDem)} ${I.u}. Stock actual ${fmt(x.stock)} ${I.u}.</p>`;
+    };
+    card.querySelectorAll('[data-paso]').forEach(b => { b.onclick = () => { const inp = D(b.dataset.k); inp.value = Math.max(1, (+inp.value || 0) + +b.dataset.paso); recalc(); }; });
+    card.querySelectorAll('[data-k]').forEach(i => { i.oninput = recalc; });
+    card.querySelectorAll('[data-e]').forEach(i => { i.oninput = teo; });
+    teo();
+    card.querySelector('[data-aplicar]').onclick = () => {
+      if (!T) { toast('Completá primero los parámetros del cálculo', 'warn'); return; }
+      D('SS').value = Math.max(1, Math.ceil(T.diasSS)); D('PP').value = Math.max(Math.ceil(T.diasSS), Math.ceil(T.diasPP));
+      recalc(); card.querySelector('details').open = true;
+      toast('Valores aplicados: guardalos con «Guardar días vigentes»', 'ok');
+    };
+    card.querySelector('[data-guardar-est]').onclick = async ev => {
+      const b = ev.currentTarget;
+      if (E('ltN') === null || E('ltMax') === null || E('nivel') === null || E('ciclo') === null) { toast('Completá los cuatro parámetros', 'warn'); return; }
+      b.disabled = true;
+      guardando(true, 'Guardando parámetros…');
+      try {
+        toast(await apiPost({ accion: 'parametros', insumo: id, ltNormal: E('ltN'), ltMax: E('ltMax'), nivelServicio: E('nivel'), ciclo: E('ciclo') }), 'ok');
+        await cargar(true);
+      } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
+    };
     card.querySelector('[data-guardar]').onclick = async ev => {
       const b = ev.currentTarget;
       b.disabled = true;
       guardando(true, 'Guardando parámetros…');
       try {
-        toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +card.querySelector('input[data-k="SS"]').value, diasPP: +card.querySelector('input[data-k="PP"]').value }), 'ok');
+        toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +D('SS').value, diasPP: +D('PP').value }), 'ok');
         await cargar(true);
       } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
     };
