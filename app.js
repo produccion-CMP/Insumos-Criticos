@@ -175,6 +175,7 @@ const ejeY = dec => ({ beginAtZero: true, ticks: { callback: v => fmt(v, dec) },
 const ejeX = () => ({ grid: { display: false }, border: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } });
 
 function capacidad(x, id) {
+  if (x.stockMax && x.stockMax > 0) return Math.max(x.stockMax, x.stock || 0, 1);
   if (id === 'gasoil' && ST.datos) return litrosSonda(219) - ST.datos.params.reservaCisterna;
   return Math.max((x.pp || 0) * 1.5, (x.stock || 0) * 1.1, 1);
 }
@@ -185,6 +186,7 @@ function ilus(id, stock, x, extra) {
   const fSS = x.ss ? Math.min(1, x.ss / cap) : null;
   const fPP = x.pp ? Math.min(1, x.pp / cap) : null;
   const pct = Math.round(fr * 100);
+  const refTxt = x.stockMax ? 'del stock máximo' : 'de la capacidad de referencia';
   const uid = id + Math.random().toString(36).slice(2, 7);
   let cuerpo = '';
   if (id === 'gasoil') {
@@ -232,7 +234,7 @@ function ilus(id, stock, x, extra) {
     });
     cuerpo += `<text x="56" y="110" text-anchor="middle">${pct} %</text>`;
   }
-  return `<svg class="ilus" viewBox="0 0 112 112" style="--c:var(--c-${id});--c2:var(--c-${id}-2)" role="img" aria-label="Nivel de stock ${pct} % de la capacidad de referencia"${extra || ''}>${cuerpo}</svg>`;
+  return `<svg class="ilus" viewBox="0 0 112 112" style="--c:var(--c-${id});--c2:var(--c-${id}-2)" role="img" aria-label="Nivel de stock ${pct} % ${refTxt}"${extra || ''}>${cuerpo}</svg>`;
 }
 
 function fechaLarga(iso) {
@@ -376,7 +378,7 @@ const AYUDA = {
   cobertura: ['Cobertura', 'Stock actual ÷ consumo medio. Consumo medio: mediana de los días con consumo (tarimas y stretch: últimos 120 días; cal: últimos 21) y promedio diario de los últimos 90 días en gasoil.'],
   ss: ['Stock de seguridad (SS)', 'Días SS × consumo medio. Si el stock baja de este valor, el insumo queda en rojo (crítico).'],
   pp: ['Punto de pedido (PP)', 'Días PP × consumo medio. Si el stock baja de este valor hay que lanzar el pedido (naranja).'],
-  insCard: ['Tarjeta del insumo', 'Stock: último stock registrado en la planilla. Días: stock ÷ consumo medio (cobertura). El dibujo muestra el nivel respecto de 1,5 veces el punto de pedido (en gasoil, respecto de la capacidad útil de la cisterna); las líneas punteadas marcan PP (naranja) y SS (rojo). Tocá la tarjeta para ver el detalle.'],
+  insCard: ['Tarjeta del insumo', 'Stock: último stock registrado en la planilla. Días: stock ÷ consumo medio (cobertura). El dibujo muestra el nivel respecto del stock máximo definido por el administrador; si no hay, respecto de 1,5 veces el punto de pedido (en gasoil, de la capacidad útil de la cisterna); las líneas punteadas marcan PP (naranja) y SS (rojo). Tocá la tarjeta para ver el detalle.'],
   tend: ['Últimos 30 días', 'Consumo diario promedio de los últimos 30 días completos contra los 30 días anteriores. Flecha arriba: se consume más.'],
   coberturaLista: ['Días de cobertura', 'Stock actual ÷ consumo medio de cada insumo. Las marcas indican los días de SS y de PP configurados.'],
   comparativa: ['Comparativa de períodos', 'Los mismos indicadores para cada período. 2025* y 2026*: del 1 de enero al último día completo de cada año. T3: julio a septiembre. La variación del año compara con el año anterior y la del trimestre con el mismo trimestre del año anterior.'],
@@ -621,22 +623,30 @@ function extrasInsumo(id, p) {
 
 function tablaProveedores(movs, u, dec, conBob, limite) {
   const g = {};
-  movs.forEach(m => { const k = m.prov || '(sin proveedor)'; g[k] = g[k] || { n: 0, q: 0, bob: 0 }; g[k].n += m.cant > 0 ? 1 : 0; g[k].q += m.cant; g[k].bob += m.bob || 0; });
-  const tot = sumar(Object.values(g), 'q');
-  const todas = Object.entries(g).sort((a, b) => b[1].q - a[1].q);
+  movs.forEach(m => {
+    const k = m.prov || '(sin proveedor)';
+    g[k] = g[k] || { n: 0, q: 0, dev: 0, nd: 0, bob: 0 };
+    if (m.cant >= 0) { g[k].n += m.cant > 0 ? 1 : 0; g[k].q += m.cant; g[k].bob += Math.max(m.bob || 0, 0); }
+    else { g[k].dev += -m.cant; g[k].nd += 1; }
+  });
+  const tot = sumar(Object.values(g), 'q'), totDev = sumar(Object.values(g), 'dev');
+  const todas = Object.entries(g).sort((a, b) => b[1].q - a[1].q || b[1].dev - a[1].dev);
   if (!todas.length) return '<div class="empty">📭 Sin ingresos en el período</div>';
   const filas = limite ? todas.slice(0, limite) : todas;
   const resto = todas.length - filas.length;
   const max = Math.max.apply(null, filas.map(f => f[1].q).concat([1]));
-  return `<div class="tw"><table><thead><tr><th>Proveedor</th><th class="n">Entregas</th><th class="n">Cantidad [${u}]</th><th class="n">Participación</th><th class="n">Por entrega</th>${conBob ? '<th class="n">Bobinas</th><th class="n">Kg/bobina</th>' : ''}</tr></thead><tbody>` +
-    filas.map(([p, x]) => `<tr><td>🏷️ ${esc(p)}</td><td class="n">${fmt(x.n)}</td><td class="n">${fmt(x.q, dec)}</td><td class="n">${pct(tot ? 100 * x.q / tot : null)}<span class="minibar"><span style="width:${100 * Math.max(x.q, 0) / max}%;background:var(--accent)"></span></span></td><td class="n">${fmt(x.n ? x.q / x.n : null, dec)}</td>${conBob ? `<td class="n">${fmt(x.bob)}</td><td class="n">${fmt(x.bob ? x.q / x.bob : null, 1)}</td>` : ''}</tr>`).join('') +
-    (resto > 0 ? `<tr class="tenue"><td colspan="${conBob ? 7 : 5}">… y ${resto} proveedores más</td></tr>` : '') +
-    `<tr class="total"><td>Total</td><td class="n">${fmt(sumar(todas.map(f => f[1].n)))}</td><td class="n">${fmt(tot, dec)}</td><td class="n">100,0 %</td><td></td>${conBob ? '<td></td><td></td>' : ''}</tr></tbody></table></div>`;
+  const conDev = totDev > 0;
+  const nc = 5 + (conDev ? 2 : 0) + (conBob ? 2 : 0);
+  return `<div class="tw"><table><thead><tr><th>Proveedor</th><th class="n">Entregas</th><th class="n">Ingresado [${u}]</th>${conDev ? `<th class="n">Devuelto [${u}]</th><th class="n">Neto [${u}]</th>` : ''}<th class="n">Participación</th><th class="n">Por entrega</th>${conBob ? '<th class="n">Bobinas</th><th class="n">Kg/bobina</th>' : ''}</tr></thead><tbody>` +
+    filas.map(([p, x]) => `<tr><td>🏷️ ${esc(p)}</td><td class="n">${fmt(x.n)}</td><td class="n">${fmt(x.q, dec)}</td>${conDev ? `<td class="n">${x.dev ? '↩️ ' + fmt(x.dev, dec) : '—'}</td><td class="n">${fmt(x.q - x.dev, dec)}</td>` : ''}<td class="n">${pct(tot ? 100 * x.q / tot : null)}<span class="minibar"><span style="width:${100 * x.q / max}%;background:var(--c, var(--accent))"></span></span></td><td class="n">${x.n ? fmt(x.q / x.n, dec) : '—'}</td>${conBob ? `<td class="n">${x.bob ? fmt(x.bob) : '—'}</td><td class="n">${x.bob ? fmt(x.q / x.bob, 1) : '—'}</td>` : ''}</tr>`).join('') +
+    (resto > 0 ? `<tr class="tenue"><td colspan="${nc}">… y ${resto} proveedores más</td></tr>` : '') +
+    `<tr class="total"><td>Total</td><td class="n">${fmt(sumar(todas.map(f => f[1].n)))}</td><td class="n">${fmt(tot, dec)}</td>${conDev ? `<td class="n">${fmt(totDev, dec)}</td><td class="n">${fmt(tot - totDev, dec)}</td>` : ''}<td class="n">${tot ? '100,0 %' : '—'}</td><td></td>${conBob ? '<td></td><td></td>' : ''}</tr></tbody></table></div>` +
+    (conDev ? `<p class="nota">Las cantidades negativas cargadas con proveedor se toman como devoluciones: no suman a los ingresos ni a la participación.</p>` : '');
 }
 
 function espTarimas(p) {
   const x = ST.modelo.tarimas;
-  const mv = movsPeriodo(x, p).filter(m => m.tipo === 'Ingreso');
+  const mv = movsPeriodo(x, p).filter(m => m.tipo === 'Ingreso' || m.tipo === 'Devolución');
   const vi = verInventario();
   $('esp').innerHTML = `<div class="grid ${vi ? 'g2' : ''}">${cardHtml('🏷️ Ingresos por proveedor', 'Período elegido · los 5 principales', tablaProveedores(mv, 'u', 0, false, 5), '', 'proveedores')}${vi ? cardHtml('📋 Inventario físico vs. sistema', 'Últimos 12 inventarios · diferencia (sistema − físico) ÷ sistema · rojo si supera 5 %', '<div class="chart"><canvas id="chE1"></canvas></div>', '', 'difInv') : ''}</div>` +
     cardHtml('🔁 Consumo, ingresos y descarte por mes', 'Unidades · últimos 18 meses', '<div class="chart lg"><canvas id="chE2"></canvas></div>');
@@ -950,7 +960,7 @@ function filtrarMov() {
 
 function vistaReposicion() {
   const M = ST.modelo;
-  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Método estadístico: SS = z·σ·√LT + consumo·(LT máx − LT) · PP = consumo·LT + SS · Stock máximo = el que definas (vacío: PP + consumo·ciclo) · Pedir = stock máximo − stock. Los valores se calculan al instante; «Aplicar» los copia a los días de SS y PP vigentes.</p>
+  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Método estadístico: SS = z·σ·√LT + consumo·(LT máx − LT) · PP = consumo·LT + SS · Stock máximo = el que definas (vacío: PP + consumo·ciclo) · Pedir = stock máximo − stock, redondeado al múltiplo de pedido. Los valores se calculan al instante; «Aplicar» los copia a los días de SS y PP vigentes.</p>
     <div class="param-grid stagger">${ORDEN.map((id, i) => {
       const x = M[id], I = INSUMOS[id], e = x.est;
       const num = (k, v, st) => `<input type="number" min="0" step="${st}" value="${v === null || v === undefined ? '' : v}" data-e="${k}" inputmode="decimal">`;
@@ -963,6 +973,8 @@ function vistaReposicion() {
           <label class="f">Nivel de servicio (%)${num('nivel', e.nivel, 0.1)}</label>
           <label class="f">Ciclo de pedido (días)${num('ciclo', e.ciclo, 1)}</label>
           <label class="f full">Stock máximo (${I.u}) · vacío = teórico${num('max', x.stockMax, 1)}</label>
+          <label class="f">Pedir en<select data-e="unidad">${unidadesPedido(id).map(o => `<option value="${o.id}" ${o.id === x.lote.unidad ? 'selected' : ''}>${o.n}</option>`).join('')}</select></label>
+          <label class="f">Múltiplo de pedido${num('mult', x.lote.multiplo, 1)}</label>
         </div>
         <div class="teo" data-teo></div>
         <div class="acciones" style="margin:0"><button class="btn pri" data-guardar-est="${id}">💾 Guardar parámetros</button><button class="btn" data-aplicar="${id}" type="button">Aplicar a SS y PP</button></div>
@@ -975,6 +987,7 @@ function vistaReposicion() {
   $('adm').querySelectorAll('.param').forEach(card => {
     const id = card.dataset.id, x = M[id], I = INSUMOS[id];
     const E = k => { const v = card.querySelector(`[data-e="${k}"]`).value; return v === '' ? null : +v; };
+    const U = () => card.querySelector('[data-e="unidad"]').value;
     const D = k => card.querySelector(`input[data-k="${k}"]`);
     let T = null;
     const recalc = () => {
@@ -985,18 +998,20 @@ function vistaReposicion() {
       const box = card.querySelector('[data-teo]');
       if (!T) { box.innerHTML = '<p class="nota">Completá lead time normal y máximo (máximo ≥ normal), nivel de servicio entre 50 y 99,99 % y ciclo de pedido para ver el cálculo.</p>'; return; }
       const f = v => fmt(Math.ceil(v));
+      const bajo = x.stock !== null && x.stock <= T.pp;
+      const R = redondearPedido(id, bajo ? T.pedir : Math.max(0, T.maxN - T.pp), U(), E('mult'));
       const vs = (t, v) => v === null || v === undefined ? '' : `<small>vigente ${fmt(v)}</small>`;
       box.innerHTML = `<div class="teo-g">
         <div><span>z (${fmt(E('nivel'), 1)} %)</span><b>${fmt(T.z, 2)}</b></div>
         <div><span>SS teórico</span><b>${f(T.ss)}</b>${vs('', x.ss)}<small>${fmt(T.diasSS, 1)} días</small></div>
         <div><span>PP teórico</span><b>${f(T.pp)}</b>${vs('', x.pp)}<small>${fmt(T.diasPP, 1)} días</small></div>
         <div><span>Stock máximo ${T.maxDef ? '(definido)' : '(teórico)'}</span><b>${f(T.maxN)}</b><small>${T.maxDef ? 'teórico ' + f(T.maxT) + ' ' + I.u : I.u}</small></div>
-        <div class="dest ${x.stock !== null && x.stock <= T.pp ? 'bad' : 'ok'}"><span>Pedir hoy</span><b>${x.stock !== null && x.stock <= T.pp ? f(T.pedir) : '0'} ${I.u}</b><small>${x.stock !== null && x.stock <= T.pp ? 'stock en o bajo el PP: pedir ya hasta el máximo' : 'stock sobre el PP · al llegar al PP pedir ' + f(Math.max(0, T.maxN - T.pp)) + ' ' + I.u}</small></div></div>
+        <div class="dest ${bajo ? 'bad' : 'ok'}"><span>Pedir ${bajo ? 'hoy' : 'al llegar al PP'}</span><b>${R.txt}</b><small>${R.o && R.o.f !== 1 ? '≈ ' + fmt(R.base) + ' ' + I.u + ' · ' : ''}${bajo ? 'stock en o bajo el PP: pedir ya' : 'stock sobre el PP'} · necesidad exacta ${f(bajo ? T.pedir : Math.max(0, T.maxN - T.pp))} ${I.u}, redondeada a múltiplos de ${fmt(E('mult') || 1)} ${R.o ? R.o.n : ''}</small></div></div>
         <p class="nota">Protección por variabilidad ${f(T.ssVar)} + protección por demora máxima ${f(T.ssDem)} ${I.u}. Stock actual ${fmt(x.stock)} ${I.u}.</p>`;
     };
     card.querySelectorAll('[data-paso]').forEach(b => { b.onclick = () => { const inp = D(b.dataset.k); inp.value = Math.max(1, (+inp.value || 0) + +b.dataset.paso); recalc(); }; });
     card.querySelectorAll('[data-k]').forEach(i => { i.oninput = recalc; });
-    card.querySelectorAll('[data-e]').forEach(i => { i.oninput = teo; });
+    card.querySelectorAll('[data-e]').forEach(i => { i.oninput = teo; i.onchange = teo; });
     teo();
     card.querySelector('[data-aplicar]').onclick = () => {
       if (!T) { toast('Completá primero los parámetros del cálculo', 'warn'); return; }
@@ -1010,7 +1025,7 @@ function vistaReposicion() {
       b.disabled = true;
       guardando(true, 'Guardando parámetros…');
       try {
-        toast(await apiPost({ accion: 'parametros', insumo: id, ltNormal: E('ltN'), ltMax: E('ltMax'), nivelServicio: E('nivel'), ciclo: E('ciclo'), stockMax: E('max') === null ? '' : E('max') }), 'ok');
+        toast(await apiPost({ accion: 'parametros', insumo: id, ltNormal: E('ltN'), ltMax: E('ltMax'), nivelServicio: E('nivel'), ciclo: E('ciclo'), stockMax: E('max') === null ? '' : E('max'), unidadPedido: U(), multiplo: E('mult') === null ? '' : E('mult') }), 'ok');
         await cargar(true);
       } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
     };
@@ -1338,6 +1353,41 @@ function graficoStockInf(cid, id, p) {
   });
 }
 
+function grPalletMeses() {
+  const tar = {};
+  ST.modelo.tarimas.serie.forEach(r => { tar[r.f] = r.cons; });
+  const g = {};
+  ST.modelo.stretch.serie.filter(r => r.f <= ST.modelo.fin && r.cons > 0 && tar[r.f] > 0).forEach(r => { const m = r.f.slice(0, 7); g[m] = g[m] || { kg: 0, p: 0, d: 0 }; g[m].kg += r.cons; g[m].p += tar[r.f]; g[m].d += 1; });
+  return g;
+}
+
+function grPalletInf(p, pre) {
+  const tar = {};
+  ST.modelo.tarimas.serie.forEach(r => { tar[r.f] = r.cons; });
+  const s = ST.modelo.stretch.serie.filter(r => r.f >= p.a && r.f <= p.b && r.cons > 0 && tar[r.f] > 0);
+  const kg = sumar(s, 'cons'), pal = sumar(s.map(r => tar[r.f]));
+  const gp = s.map(r => 1000 * r.cons / tar[r.f]).sort((a, b) => a - b);
+  const prom = pal ? 1000 * kg / pal : null;
+  const med = gp.length ? gp[Math.floor((gp.length - 1) / 2)] : null;
+  const sd = gp.length > 1 ? Math.sqrt(sumar(gp.map(v => (v - sumar(gp) / gp.length) ** 2)) / (gp.length - 1)) : null;
+  const g = grPalletMeses();
+  const ms = Object.keys(g).sort().slice(-12);
+  const tabla = ms.length ? `<div class="tw"><table><thead><tr><th>Mes</th><th class="n">Stretch [kg]</th><th class="n">Pallets</th><th class="n">g/pallet</th><th class="n">Var. vs. mes ant.</th></tr></thead><tbody>${ms.map((m, i) => { const v = 1000 * g[m].kg / g[m].p, ant = i ? 1000 * g[ms[i - 1]].kg / g[ms[i - 1]].p : null; return `<tr><td>${fMes(m)}</td><td class="n">${fmt(g[m].kg, 1)}</td><td class="n">${fmt(g[m].p)}</td><td class="n"><b>${fmt(v)}</b></td><td class="n">${ant ? pct(100 * (v - ant) / ant) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Sin días con consumo de stretch y pallets producidos</div>';
+  return `<div class="inf-sec"><h3 class="inf-h">6 · Consumo de stretch por pallet</h3>
+    <div class="inf-kpis">${infKpi('Promedio del período', fmt(prom) + ' g/pallet', `${fmt(kg, 1)} kg ÷ ${fmt(pal)} pallets`)}${infKpi('Mediana diaria', fmt(med) + ' g', `${fmt(gp.length)} días con datos`)}${infKpi('Dispersión diaria (σ)', fmt(sd) + ' g', 'variación entre días')}${infKpi('Rango diario', gp.length ? `${fmt(gp[0])} – ${fmt(gp[gp.length - 1])} g` : '—', 'mínimo – máximo')}</div>
+    <div class="inf-2"><div><h4>g/pallet por mes · últimos 12 meses</h4><div class="inf-chart medio"><canvas id="${pre}-gp"></canvas></div></div><div>${tabla}</div></div>
+    <p class="nota">Se consideran solo los días con consumo de stretch y pallets (tarimas) producidos. g/pallet = kg de stretch × 1000 ÷ pallets.</p></div>`;
+}
+
+function graficoGrPalletInf(cid, p) {
+  const g = grPalletMeses(), ms = Object.keys(g).sort().slice(-12), ci = colorIns('stretch');
+  grafico(cid, {
+    type: 'bar',
+    data: { labels: ms.map(fMes), datasets: [{ data: ms.map(m => 1000 * g[m].kg / g[m].p), borderRadius: 3, backgroundColor: ms.map(m => (m >= p.a.slice(0, 7) && m <= p.b.slice(0, 7)) ? ci : alfa(ci, .3)) }] },
+    options: { animation: false, devicePixelRatio: 2, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: Object.assign(ejeX(), { ticks: { maxTicksLimit: 12, maxRotation: 0, font: { size: 8.5 } } }), y: Object.assign(ejeY(0), { beginAtZero: false, ticks: { font: { size: 8.5 } } }) } }
+  });
+}
+
 function graficoMensualInf(cid, id, p) {
   const ci = colorIns(id), men = mensual(id).slice(-24);
   grafico(cid, {
@@ -1412,10 +1462,10 @@ function informeInsumo(id, pid, pre) {
   if (vi && id !== 'gasoil') ks.push(infKpi('Ajuste por controles 6:00', fmt(k.ajusteTotal), `${fmt(k.controles)} controles · uso interno`));
   let esp = '';
   if (id === 'tarimas') {
-    esp = `<div class="inf-sec"><h3 class="inf-h">5 · Ingresos por proveedor</h3>${tablaProveedores(movsPeriodo(x, p).filter(m => m.tipo === 'Ingreso'), 'u', 0)}</div>`;
+    esp = `<div class="inf-sec"><h3 class="inf-h">5 · Ingresos por proveedor</h3>${tablaProveedores(movsPeriodo(x, p).filter(m => m.tipo === 'Ingreso' || m.tipo === 'Devolución'), 'u', 0)}</div>`;
     if (vi) esp += tablaInventarioInf(x, p, 'u');
   } else if (id === 'stretch') {
-    esp = `<div class="inf-sec"><h3 class="inf-h">5 · Ingresos por proveedor</h3>${tablaProveedores(movsPeriodo(x, p).filter(m => m.tipo !== 'Envío'), 'kg', 1, true)}</div>`;
+    esp = `<div class="inf-sec"><h3 class="inf-h">5 · Ingresos por proveedor</h3>${tablaProveedores(movsPeriodo(x, p).filter(m => m.tipo !== 'Envío'), 'kg', 1, true)}</div>` + grPalletInf(p, pre);
     if (vi) esp += tablaInventarioInf(x, p, 'bobinas');
   } else if (id === 'gasoil') {
     esp = `<div class="inf-sec"><h3 class="inf-h">5 · Consumo por departamento</h3><div class="inf-gas"><div>${tablaDeptosGasoil(p, P)}</div><div class="inf-chart alto"><canvas id="${pre}-dep"></canvas></div></div></div>
@@ -1437,7 +1487,7 @@ function informeInsumo(id, pid, pre) {
       ${esp}
       ${glosarioInforme(claves)}
       <footer class="inf-pie">Fuente: ${id === 'gasoil' ? 'planilla «Combustible CMP» (DetalleCevil, Control_Diaro, Cargas_y_Ajustes)' : 'planilla «Stock Insumos Criticos CEVIL»'}. Datos al ${fFecha(M.fin)}.</footer></article>`;
-  return { html, dibujar: () => { graficoStockInf(`${pre}-st`, id, p); graficoMensualInf(`${pre}-men`, id, p); if (id === 'gasoil') graficoDeptosMes(`${pre}-dep`, false); } };
+  return { html, dibujar: () => { graficoStockInf(`${pre}-st`, id, p); graficoMensualInf(`${pre}-men`, id, p); if (id === 'gasoil') graficoDeptosMes(`${pre}-dep`, false); if (id === 'stretch') graficoGrPalletInf(`${pre}-gp`, p); } };
 }
 
 function tablaInventarioInf(x, p, u) {

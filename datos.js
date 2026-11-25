@@ -91,7 +91,7 @@ function construirModelo(D) {
 
   M.tarimas = {
     serie: D.tarimas.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, env: r[3] || 0, cons: r[4] || 0, desc: r[5] || 0, sist: r[6], ctrl: r[7], consT1: r[8], aj: r[9], stock: r[10] })),
-    movs: D.tarimas.movs.map(r => ({ hoja: 'movTarimas', fila: r[0], f: r[1], cant: r[2], prov: r[3], remito: r[4], obs: r[5], tipo: r[3] === 'Envío' ? 'Envío' : 'Ingreso' })),
+    movs: D.tarimas.movs.map(r => ({ hoja: 'movTarimas', fila: r[0], f: r[1], cant: r[2], prov: r[3], remito: r[4], obs: r[5], tipo: r[3] === 'Envío' ? 'Envío' : (r[2] < 0 ? 'Devolución' : 'Ingreso') })),
     descarte: D.tarimas.descarte.map(r => ({ hoja: 'descarteTarimas', fila: r[0], f: r[1], cant: r[2], prov: r[3], obs: r[4], tipo: 'Descarte' })),
     inventario: (D.tarimas.inventario || []).map(r => ({ f: r[0], fis: r[1], sis: r[2] }))
   };
@@ -104,7 +104,7 @@ function construirModelo(D) {
 
   M.cal = {
     serie: D.cal.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, env: 0, cons: r[3] || 0, sist: r[4], ctrl: r[5], consT1: r[6], aj: r[7], stock: r[8] })),
-    movs: D.cal.movs.map(r => ({ hoja: 'movCal', fila: r[0], f: r[1], cant: r[2], prov: '', obs: r[3], tipo: 'Ingreso' }))
+    movs: D.cal.movs.map(r => ({ hoja: 'movCal', fila: r[0], f: r[1], cant: r[2], prov: '', obs: r[3], tipo: r[2] < 0 ? 'Devolución' : 'Ingreso' }))
   };
 
   const ultDep = {};
@@ -141,6 +141,9 @@ function construirModelo(D) {
     ins.diasPP = nec && nec.diasPP ? nec.diasPP : INSUMOS[id].defPP;
     ins.paramGuardado = !!(nec && nec.diasSS && nec.diasPP);
     ins.stockMax = nec && nec.stockMax ? nec.stockMax : null;
+    const uopc = unidadesPedido(id);
+    const ud = uopc.find(o => o.id === (nec && nec.unidadPedido)) || uopc.find(o => o.def) || uopc[0];
+    ins.lote = { unidad: ud.id, multiplo: nec && nec.multiplo ? nec.multiplo : ud.mult };
     ins.est = { ltN: nec && nec.ltNormal ? nec.ltNormal : null, ltMax: nec && nec.ltMax ? nec.ltMax : null, nivel: nec && nec.nivelServicio ? nec.nivelServicio : 95, ciclo: nec && nec.ciclo ? nec.ciclo : 7, guardado: !!(nec && nec.ltNormal && nec.ltMax) };
     ins.sigma = sigmaConsumo(id, ins, hoy);
     ins.ss = ins.medio !== null ? Math.ceil(ins.diasSS * ins.medio) : null;
@@ -174,6 +177,24 @@ function rangoCalc(fin, inicio) {
   else if (r.modo === 'todo') { a = inicio; nombre = 'Todo el historial'; }
   else { const n = Math.max(+r.modo || 7, 1); a = isoDn(dn(fin) - (n - 1)); nombre = 'Últimos ' + n + ' días'; }
   return { a, b, nombre };
+}
+
+function unidadesPedido(id) {
+  const kb = (ST.datos && ST.datos.params && ST.datos.params.kgPorBobina) || 15;
+  return {
+    tarimas: [{ id: 'u', n: 'unidades', f: 1, mult: 10, def: true }],
+    stretch: [{ id: 'kg', n: 'kg', f: 1, mult: 1 }, { id: 'bob', n: 'bobinas', f: kb, mult: 1 }, { id: 'pallet', n: 'pallets (69 bobinas)', f: 69 * kb, mult: 1, def: true }],
+    gasoil: [{ id: 'L', n: 'litros', f: 1, mult: 5000, def: true }],
+    cal: [{ id: 'bolsas', n: 'bolsas', f: 1, mult: 1 }, { id: 'pallet', n: 'pallets (75 bolsas)', f: 75, mult: 1, def: true }]
+  }[id];
+}
+
+function redondearPedido(id, cant, unidad, multiplo) {
+  if (cant === null || cant === undefined || !(cant > 0)) return { base: 0, q: 0, txt: '0' };
+  const o = unidadesPedido(id).find(x => x.id === unidad) || unidadesPedido(id)[0];
+  const m = multiplo > 0 ? multiplo : 1;
+  const q = Math.ceil(cant / o.f / m - 1e-9) * m;
+  return { base: q * o.f, q, o, txt: fmt(q, q % 1 ? 1 : 0) + ' ' + o.n };
 }
 
 function sigmaConsumo(id, ins, hoy) {

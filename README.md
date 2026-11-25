@@ -134,3 +134,10 @@ En Administración › Reposición, por insumo: consumo medio, σ diaria, lead t
 - **Supervisor (nuevo):** Informes, Movimientos y la sección Administración › Avisar, para informar problemas, faltantes, urgencias u observaciones. Solo el administrador las ve.
 - **Administrador:** Administración › Avisos (pendientes, resueltos, marcar como resuelto) y Reposición con **stock máximo** editable por insumo (vacío = teórico).
 - Hoja nueva «AvisosApp» (se crea sola). Stock máximo en Necesidades, columna M. Hay que volver a publicar Code.gs.
+
+## v10
+
+- El dibujo de Inicio usa el stock máximo definido como 100 % (si no hay, la referencia anterior).
+- Pedido redondeado: unidad de pedido y múltiplo por insumo (Necesidades, columnas N y O). Por defecto: tarimas de a 10 u, stretch por pallet de 69 bobinas, gasoil de a 5.000 L, cal por pallet de 75 bolsas.
+- Informe de stretch: sección 6 «Consumo de stretch por pallet» (promedio, mediana, σ, rango y tabla y gráfico mensual).
+- Cantidades negativas con proveedor = devolución, en tarimas, stretch y cal. La tabla de proveedores separa Ingresado, Devuelto y Neto.
