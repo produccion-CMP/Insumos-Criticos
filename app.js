@@ -30,12 +30,34 @@ const BNAV = [
   { id: 'movimientos', e: '🧾', n: 'Movimientos' },
   { id: 'admin', e: '⚙️', n: 'Admin.' }
 ];
+const CAT_UI = (() => {
+  const comK = [['lDia', 'Consumo diario'], ['lDiaOp', 'Por día operativo'], ['cons', 'Consumo total'], ['ing', 'Ingresos'], ['stockProm', 'Stock promedio y cobertura'], ['diasSS', 'Días bajo SS'], ['sem', 'Consumo / ingresos por semana (informe)']];
+  const comC = ['📦 Evolución del stock', '📊 Consumo diario por mes', '🧾 Últimos movimientos', '🔐 Ajustes por control físico e inventario', '📋 Comparativa de períodos'];
+  const c = l => l.map(t => ['c:' + slugVk(t), t]);
+  const k = l => l.map(x => ['k:' + x[0], x[1]]);
+  return {
+    inicio: { n: 'Inicio', items: k([['dibujo', 'Dibujo del nivel de stock'], ['spark', 'Minigráfico de stock (60 días)'], ['consSem', 'Consumo promedio por semana'], ['ingSem', 'Ingresos promedio por semana']]).concat([['c:cobertura', '⏳ Días de cobertura'], ['c:tendencia', '📈 Últimos 30 días'], ['c:alertas', '🔔 Alertas']]) },
+    tarimas: { n: 'Tarimas', items: k(comK.concat([['descarte', 'Descarte'], ['difInv', 'Inventario vs. sistema']])).concat(c(comC.concat(['🏷️ Ingresos por proveedor', '📋 Inventario físico vs. sistema', '🔁 Consumo, ingresos y descarte por mes']))) },
+    stretch: { n: 'Stretch', items: k(comK.concat([['grPallet', 'Stretch por pallet'], ['bobDia', 'Bobinas por día'], ['kgBob', 'Kg por bobina recibida'], ['difInv', 'Inventario vs. sistema']])).concat(c(comC.concat(['🏷️ Ingresos por proveedor', '🎁 Stretch por pallet', '📋 Inventario físico vs. sistema']))) },
+    gasoil: { n: 'Gasoil', items: k(comK.concat([['despachos', 'Despachos'], ['unidades', 'Unidades con consumo']])).concat(c(comC.filter(t => t.indexOf('Ajustes') < 0).concat(['🏢 Consumo por departamento', '🛢️ Cargas de cisterna', '🚛 Unidades de mayor consumo', '📊 Consumo por departamento y mes']))) },
+    cal: { n: 'Cal', items: k(comK).concat(c(comC.concat(['📆 Consumo diario', '📥 Ingresos']))) }
+  };
+})();
+
+function aplicarUiCss() {
+  let st = document.getElementById('uiOcultos');
+  if (!st) { st = document.createElement('style'); st.id = 'uiOcultos'; document.head.appendChild(st); }
+  st.textContent = uiCfg().ocultos.map(s => { const i = s.indexOf(':'); const sc = s.slice(0, i), vk = s.slice(i + 1); return `${sc === '*' ? '' : `[data-vkscope="${sc}"] `}[data-vk="${vk}"]{display:none!important}`; }).join('\n');
+}
+
 const ADMIN_SEC = [
   { id: 'registrar', e: '➕', n: 'Registrar', admin: false, reg: true },
   { id: 'avisar', e: '📣', n: 'Avisar', admin: false, sup: true },
   { id: 'avisos', e: '📬', n: 'Avisos', admin: true },
   { id: 'reposicion', e: '🛒', n: 'Reposición', admin: true },
   { id: 'mails', e: '✉️', n: 'Mails', admin: true },
+  { id: 'pantalla', e: '🧩', n: 'Indicadores', admin: true },
+  { id: 'roles', e: '🔑', n: 'Roles', admin: true },
   { id: 'usuarios', e: '👥', n: 'Usuarios', admin: true },
   { id: 'conexion', e: '🔌', n: 'Conexión', admin: true },
   { id: 'cuenta', e: '👤', n: 'Mi cuenta', admin: false }
@@ -108,8 +130,9 @@ function moverPill(cont) {
   pill.style.width = on.offsetWidth + 'px';
 }
 
-const vistasVisibles = () => VISTAS.filter(x => !(x.id === 'informe' || x.id === 'movimientos') || verReportes());
-const bnavVisibles = () => BNAV.filter(x => !(x.id === 'informe' || x.id === 'movimientos') || verReportes());
+const visibleVista = x => x.id === 'informe' ? verInformes() : x.id === 'movimientos' ? verMovimientos() : true;
+const vistasVisibles = () => VISTAS.filter(visibleVista);
+const bnavVisibles = () => BNAV.filter(visibleVista);
 
 function pintarNav() {
   const v = ST.vista;
@@ -254,14 +277,14 @@ function vistaResumen() {
     const semTxt = sem.dias < 84 ? `últimos ${sem.dias} días` : 'últimas 12 semanas';
     return `<article class="card hover ins-card ${x.estado}" style="--c:var(--c-${id});--c2:var(--c-${id}-2);--i:${i}" data-ir="${id}" data-ak="insCard" tabindex="0">
       <div class="ins-cab"><span class="ins-ico">${I.ico}</span><div><h3>${I.nombre}</h3><div class="sub">${I.desc}</div></div><span class="tag est-tag">${ESTADO[x.estado]}</span>${btnAyuda('insCard')}</div>
-      <div class="ins-cuerpo">${ilus(id, x.stock, x)}
+      <div class="ins-cuerpo"><div data-vk="k:dibujo" class="vk-dib">${ilus(id, x.stock, x)}</div>
         <div class="ins-num"><div class="v">${fmt(x.stock)}<small>${I.u}</small></div>
           ${id === 'stretch' && x.ultimo ? `<div class="bob">≈ ${fmt(x.ultimo.stockBob)} bobinas</div>` : ''}
           <div class="cob" title="Stock actual ÷ consumo medio">⏳ <b>${fmt(x.cobertura, 1)}</b> días</div></div></div>
-      <div class="ins-spark" data-ak="spark"><div class="spark-lect" id="spl-${id}">Stock de los últimos 60 días · pasá el puntero</div><canvas id="sp-${id}"></canvas></div>
+      <div class="ins-spark" data-ak="spark" data-vk="k:spark"><div class="spark-lect" id="spl-${id}">Stock de los últimos 60 días · pasá el puntero</div><canvas id="sp-${id}"></canvas></div>
       <div class="ins-pie dos">
-        <div data-ak="consSem"><span>Consumo promedio por semana</span><b>${fmt(sem.cons, I.dec)} <small>${I.u}</small></b></div>
-        <div data-ak="ingSem"><span>Ingresos promedio por semana</span><b>${fmt(sem.ing, I.dec)} <small>${I.u}</small></b></div>
+        <div data-ak="consSem" data-vk="k:consSem"><span>Consumo promedio por semana</span><b>${fmt(sem.cons, I.dec)} <small>${I.u}</small></b></div>
+        <div data-ak="ingSem" data-vk="k:ingSem"><span>Ingresos promedio por semana</span><b>${fmt(sem.ing, I.dec)} <small>${I.u}</small></b></div>
         <p class="pie-nota">${semTxt} · PP ${fmt(x.pp)} ${I.u}</p>
       </div></article>`;
   }).join('');
@@ -285,18 +308,18 @@ function vistaResumen() {
     return `<div class="tend-fila"><span class="e">${I.ico}</span><div><b>${fmt(k.lDia, I.dec)} ${I.u}/día</b><div class="sub">Antes: ${fmt(kp.lDia, I.dec)} ${I.u}/día · ingresos ${fmt(k.ingTotal)} ${I.u}</div></div><span class="flecha ${cls}">${fl}</span></div>`;
   }).join('');
 
-  app().innerHTML = `<section class="vista">
+  app().innerHTML = `<section class="vista" data-vkscope="inicio">
     <div class="hero"><div><div class="eyebrow">${fechaLarga(M.hoy)} · Planta Cevil</div><h1>Insumos <span>críticos</span></h1>
       <p class="sub">Stock al último registro y cobertura con el consumo medio de cada insumo.</p></div>
       <div class="hero-der"><div class="resumen-chips">${chips}</div><div class="hero-acc">${btnGlosario()}${btnImprimir('general', 'Imprimir informe general')}</div></div></div>
     <div class="ins-grid stagger">${cards}</div>
     <div class="grid g2">
-      <div class="card"><div class="card-h"><div class="t"><h3>⏳ Días de cobertura</h3><span class="sub">Stock actual ÷ consumo medio</span></div>${btnAyuda('coberturaLista')}</div>
+      <div class="card" data-vk="c:cobertura"><div class="card-h"><div class="t"><h3>⏳ Días de cobertura</h3><span class="sub">Stock actual ÷ consumo medio</span></div>${btnAyuda('coberturaLista')}</div>
         <div class="cob-lista">${cob}</div>
         <div class="cob-ley"><span><i style="background:var(--warn)"></i>Punto de pedido</span><span><i style="background:var(--bad)"></i>Stock de seguridad</span></div></div>
-      <div class="card"><div class="card-h"><div class="t"><h3>📈 Últimos 30 días</h3><span class="sub">Consumo diario contra los 30 días anteriores</span></div>${btnAyuda('tend')}</div><div class="tend">${tend}</div></div>
+      <div class="card" data-vk="c:tendencia"><div class="card-h"><div class="t"><h3>📈 Últimos 30 días</h3><span class="sub">Consumo diario contra los 30 días anteriores</span></div>${btnAyuda('tend')}</div><div class="tend">${tend}</div></div>
     </div>
-    <div class="card"><div class="card-h"><div class="t"><h3>🔔 Alertas</h3><span class="sub">Lo que conviene revisar hoy</span></div></div><div class="alertas">${alertas().map((a, i) => `<div class="alerta ${a[0]}" style="animation-delay:${i * 40}ms"><span class="e">${a[1]}</span><span>${esc(a[2])}</span></div>`).join('')}</div></div>
+    <div class="card" data-vk="c:alertas"><div class="card-h"><div class="t"><h3>🔔 Alertas</h3><span class="sub">Lo que conviene revisar hoy</span></div></div><div class="alertas">${alertas().map((a, i) => `<div class="alerta ${a[0]}" style="animation-delay:${i * 40}ms"><span class="e">${a[1]}</span><span>${esc(a[2])}</span></div>`).join('')}</div></div>
   </section>`;
 
   app().querySelectorAll('[data-ir]').forEach(el => {
@@ -363,7 +386,7 @@ const AYUDA = {
   consSem: ['Consumo promedio por semana', 'Consumo de las últimas 12 semanas completas (o desde el primer dato, si hay menos) ÷ días × 7.'],
   ingSem: ['Ingresos promedio por semana', 'Ingresos de proveedores de las últimas 12 semanas (o desde el primer dato) ÷ días × 7. En gasoil, cargas de cisterna.'],
   spark: ['Curva de stock', 'Stock de fin de día de los últimos 60 días. La línea punteada es el punto de pedido. Pasá el puntero por la curva para ver el valor de cada día.'],
-  consT1: ['Consumo del turno 1', 'Bolsas consumidas en el turno 1 (22:00 a 6:00) por día, según el Informe de Producción, y su parte del consumo total.'],
+  consDia: ['Consumo diario', 'Bolsas de cal consumidas cada día en los últimos 45 días del período elegido.'],
   ajustes: ['Ajustes por control físico e inventario', 'Control de las 6:00: contado − stock del sistema a esa hora. Inventario: (sistema − físico) ÷ sistema. Solo lo ven administradores, Responsable de Compras y usuarios autorizados.'],
   movsIns: ['Últimos movimientos', 'Ingresos, envíos, descartes y cargas más recientes del insumo. «Ver todos» abre el historial completo.'],
   ing: ['Ingresos', 'Ingresos netos del período: lo recibido de proveedores menos lo devuelto. Cada devolución se descuenta del último ingreso anterior (del mismo proveedor si existe), así el neto nunca supera lo recibido ni queda negativo. Entregas: remitos con ingreso. Por entrega: neto ÷ entregas.'],
@@ -375,7 +398,7 @@ const AYUDA = {
   bobDia: ['Bobinas por día', 'Consumo diario de stretch en kg ÷ 15 kg por bobina.'],
   kgBob: ['Kg por bobina recibida', 'Kg recibidos ÷ bobinas recibidas en los ingresos del período. Si da menos de 15 kg, la planilla subestima las bobinas en stock.'],
   despachos: ['Despachos', 'Cargas de combustible registradas por el surtidor (Cintelink). L por despacho = litros ÷ despachos.'],
-  unidades: ['Unidades con consumo', 'Cantidad de unidades distintas que cargaron. Top 3: porcentaje del consumo que concentran las tres unidades que más cargaron.'],
+  unidades: ['Unidades con consumo', 'Cantidad de unidades distintas que cargaron gasoil en el período. Debajo: qué parte del consumo total suman las 3 unidades que más cargaron (ej.: 45 % = casi la mitad del gasoil lo usaron 3 equipos). Sirve para ver si el consumo depende de pocos equipos.'],
   cobertura: ['Cobertura', 'Stock actual ÷ consumo medio. Consumo medio: mediana de los días con consumo (tarimas y stretch: últimos 120 días; cal: últimos 21) y promedio diario de los últimos 90 días en gasoil.'],
   ss: ['Stock de seguridad (SS)', 'Días SS × consumo medio. Si el stock baja de este valor, el insumo queda en rojo (crítico).'],
   pp: ['Punto de pedido (PP)', 'Días PP × consumo medio. Si el stock baja de este valor hay que lanzar el pedido (naranja).'],
@@ -432,7 +455,97 @@ function abrirGlosario() {
 }
 
 const btnGlosario = () => `<button type="button" class="btn sm" data-glosario>${ICO.libro}Glosario</button>`;
-const btnImprimir = (scope, txt) => verReportes() ? `<button type="button" class="btn sm pri" data-imprimir="${scope}">${ICO.imprimir}${txt || 'Imprimir informe'}</button>` : '';
+const btnImprimir = (scope, txt) => verInformes() ? `<button type="button" class="btn sm pri" data-imprimir="${scope}">${ICO.imprimir}${txt || 'Imprimir informe'}</button>` : '';
+
+const AYUDA_COL = {
+  'activo': 'Si está tildado, el usuario o destinatario está habilitado.',
+  'ajuste': 'Diferencia entre lo contado y lo que indicaba el sistema en ese control. Positivo: había más de lo que figuraba.',
+  'bobinas': 'Cantidad de bobinas de stretch recibidas.',
+  'cobertura prom.': 'Stock promedio ÷ consumo diario promedio: cuántos días de consumo había en depósito en promedio.',
+  'cobertura promedio': 'Stock promedio ÷ consumo diario promedio: cuántos días de consumo había en depósito en promedio.',
+  'consumo total': 'Suma de todo lo consumido en el período.',
+  'consumo/día': 'Consumo total ÷ días del período.',
+  'consumo': 'Consumo promedio por día del período (consumo total ÷ días calendario).',
+  'contado': 'Cantidad contada físicamente en el control.',
+  'control 6:00': 'Fecha del control físico realizado a las 6:00.',
+  'departamento': 'Área a la que pertenecen las unidades que cargaron gasoil.',
+  'despachos': 'Cantidad de cargas de gasoil a unidades.',
+  'devuelto': 'Cantidad devuelta al proveedor (registros negativos con proveedor).',
+  'dif. %': 'Diferencia ÷ stock del sistema, en porcentaje.',
+  'diferencia': 'Físico − sistema. Negativo: faltante respecto de lo que indicaba el sistema.',
+  'días bajo ss': 'Días del período en que el stock estuvo por debajo del stock de seguridad.',
+  'días entre cargas': 'Días activos de la unidad ÷ cantidad de despachos: cada cuántos días carga en promedio.',
+  'entregas': 'Cantidad de remitos o ingresos recibidos del proveedor.',
+  'estado': 'Situación del registro o del stock (por ejemplo: ok, pedir, bajo SS, pendiente, resuelto).',
+  'físico': 'Cantidad contada en el inventario.',
+  'ingresado': 'Total recibido del proveedor, sin descontar devoluciones.',
+  'ingresos': 'Ingresos netos: lo recibido menos lo devuelto a proveedores.',
+  'inventario': 'Fecha del inventario físico.',
+  'kg/bobina': 'Kilos recibidos ÷ bobinas recibidas: peso medio de cada bobina.',
+  'l/despacho': 'Litros ÷ despachos: carga promedio por despacho.',
+  'l/día': 'Litros ÷ días calendario del período.',
+  'l/día activo': 'Litros ÷ días desde la primera carga de la unidad dentro del período (en gris si son menos de 30 días).',
+  'l/día comp.': 'L/día del período de comparación.',
+  'l/h · km/l': 'Rendimiento estimado: litros por hora (máquinas, con horómetro) o kilómetros por litro (vehículos, con odómetro). Se descartan lecturas incoherentes.',
+  'litros': 'Litros cargados en el período.',
+  'mes': 'Mes calendario.',
+  'neto': 'Ingresado − devuelto.',
+  'pallets': 'Pallets producidos (tarimas consumidas) en el mes.',
+  'part.': 'Participación: porcentaje del consumo total del período.',
+  'participación': 'Porcentaje que representa sobre el total ingresado del período.',
+  'por entrega': 'Cantidad ingresada ÷ entregas: tamaño promedio de cada entrega.',
+  'proveedor': 'Proveedor del ingreso o de la devolución.',
+  'sistema': 'Stock que indicaba el sistema en ese momento.',
+  'stock prom.': 'Promedio del stock de fin de día del período.',
+  'stock promedio': 'Promedio del stock de fin de día del período.',
+  'stretch': 'Kilos de stretch consumidos.',
+  'teórico': 'Valor calculado con el método estadístico (consumo medio, σ, lead time y nivel de servicio).',
+  'vigente': 'Valor guardado que usan hoy el semáforo, los informes y las alertas.',
+  'g/pallet': 'Gramos de stretch por pallet = kg de stretch × 1000 ÷ pallets producidos.',
+  'último ingreso': 'Fecha y cantidad neta del último ingreso registrado.',
+  'unid.': 'Cantidad de unidades del departamento que cargaron.',
+  'unidad': 'Equipo o vehículo que cargó gasoil.',
+  'var.': 'Variación porcentual respecto del período de comparación.',
+  'var. vs. mes ant.': 'Variación porcentual respecto del mes anterior.',
+  'días del período': 'Cantidad de días calendario del período.',
+  'día pico': 'Mayor consumo registrado en un solo día del período.',
+  'días sin consumo': 'Días del período sin consumo registrado.',
+  'variabilidad diaria (cv)': 'Coeficiente de variación = desvío estándar ÷ promedio del consumo diario. Más alto: consumo más irregular.',
+  'concentración 3 unidades principales': 'Qué parte del consumo total suman las 3 unidades que más cargaron.',
+  'descarte': 'Tarimas descartadas (rotas o inutilizables).',
+  'stretch por pallet': 'Gramos de stretch por pallet producido.',
+  'variación del consumo diario': 'Variación del consumo diario contra el período de comparación de cada columna.',
+  'histórico': 'Todo el historial disponible.',
+  'últ. 365 d': 'Últimos 365 días.',
+  'semanal': 'Recibe el resumen semanal por mail.',
+  'alerta pp': 'Recibe la alerta de punto de pedido.',
+  'alerta ss': 'Recibe la alerta de stock de seguridad.',
+  'ver inventarios': 'Puede ver y cargar inventarios físicos y ajustes.',
+  'rol': 'Tipo de usuario, que define qué puede ver y hacer.',
+  'insumo': 'Insumo crítico.',
+  'indicador': 'Nombre del indicador.'
+};
+
+function normCol(t) { return String(t || '').replace(/\[[^\]]*\]/g, '').replace(/[*:]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+
+function etiquetarTablas(raiz) {
+  (raiz || document).querySelectorAll('table th:not([data-ak]), table.comp tbody td:first-child:not([data-ak])').forEach(c => {
+    const k = normCol(c.textContent);
+    const txt = AYUDA_COL[k];
+    if (!txt) return;
+    const ak = 'col_' + k.replace(/[^a-z0-9áéíóúñ]+/g, '_');
+    if (!AYUDA[ak]) AYUDA[ak] = [c.textContent.trim(), txt];
+    c.dataset.ak = ak;
+    if (!c.title) c.title = txt;
+  });
+}
+
+(function observarTablas() {
+  let t = null;
+  const obs = new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => etiquetarTablas(document), 60); });
+  const go = () => obs.observe(document.body, { childList: true, subtree: true });
+  if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);
+})();
 
 function ayudaEn(el) {
   const a = AYUDA[el.dataset.ak];
@@ -460,11 +573,13 @@ function alternarModoAyuda(forzar) {
 }
 
 function kpiHtml(e, l, v, u, d, cls, ak) {
-  return `<div class="kpi kacc ${cls || ''}"${ak ? ` data-ak="${ak}"` : ''}>${btnAyuda(ak)}<div class="l"><span class="e">${e}</span>${l}</div><div class="v">${v}${u ? `<small>${u}</small>` : ''}</div><div class="d">${d || '&nbsp;'}</div></div>`;
+  return `<div class="kpi kacc ${cls || ''}"${ak ? ` data-ak="${ak}" data-vk="k:${ak}"` : ''}>${btnAyuda(ak)}<div class="l"><span class="e">${e}</span>${l}</div><div class="v">${v}${u ? `<small>${u}</small>` : ''}</div><div class="d">${d || '&nbsp;'}</div></div>`;
 }
 
+function slugVk(t) { return String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase(); }
+
 function cardHtml(titulo, sub, cuerpo, extra, ak) {
-  return `<div class="card"${extra || ''}${ak ? ` data-ak="${ak}"` : ''}><div class="card-h"><div class="t"><h3>${titulo}</h3>${sub ? `<span class="sub">${sub}</span>` : ''}</div>${btnAyuda(ak)}</div>${cuerpo}</div>`;
+  return `<div class="card"${extra || ''}${ak ? ` data-ak="${ak}"` : ''} data-vk="c:${slugVk(titulo)}"><div class="card-h"><div class="t"><h3>${titulo}</h3>${sub ? `<span class="sub">${sub}</span>` : ''}</div>${btnAyuda(ak)}</div>${cuerpo}</div>`;
 }
 
 function controlRangoHtml() {
@@ -524,16 +639,12 @@ function vistaInsumo(id) {
     ...(verInventario() ? [kpiHtml('📋', 'Inventario vs. sistema', pct(k.difInv), '', `${fmt(k.inventarios)} inventarios`, Math.abs(k.difInv || 0) > 5 ? 'warn' : '', 'difInv')] : []));
   if (id === 'gasoil') ks.push(
     kpiHtml('🧾', 'Despachos', fmt(k.despachos), '', `${fmt(k.lDespacho, 1)} L por despacho`, '', 'despachos'),
-    kpiHtml('🚛', 'Unidades con consumo', fmt(k.unidades), '', `Top 3 unidades: ${pct(k.top3)} del consumo`, '', 'unidades'));
-  if (id === 'cal') {
-    const t1 = sumar(x.serie.filter(r => r.f >= p.a && r.f <= p.b), 'consT1');
-    ks.push(kpiHtml('🌙', 'Consumo turno 1', fmt(k.diasDatos ? t1 / k.diasDatos : null, 1), 'bolsas/día', `${pct(k.cons ? 100 * t1 / k.cons : null)} del consumo total`, '', 'consT1'));
-  }
+    kpiHtml('🚛', 'Unidades con consumo', fmt(k.unidades), '', `Las 3 que más cargaron suman ${pct(k.top3)} del consumo`, '', 'unidades'));
 
   const seg = ORDEN.map(i => `<button data-ins="${i}" class="${i === id ? 'on' : ''}"><span>${INSUMOS[i].ico}</span>${INSUMOS[i].nombre}</button>`).join('');
   const segP = PERIODOS_UI.map(q => `<button data-per="${q.id}" class="${q.id === ST.per ? 'on' : ''}"><span>${q.e}</span>${q.n}</button>`).join('');
   const ctrl = ultimoControl(x);
-  app().innerHTML = `<section class="vista">
+  app().innerHTML = `<section class="vista" data-vkscope="${id}">
     <div class="seg solo-movil" id="segIns" style="margin-bottom:14px">${seg}</div>
     <div class="card det-hero ${x.estado}" style="--c:var(--c-${id})">
       <span class="ins-ico">${I.ico}</span>
@@ -698,11 +809,11 @@ function espStretch(p) {
 function espCal(p) {
   const x = ST.modelo.cal;
   const s = x.serie.filter(r => r.f >= p.a && r.f <= p.b).slice(-45);
-  $('esp').innerHTML = `<div class="grid g-21">${cardHtml('📆 Consumo diario', 'Bolsas por día y del turno 1 · últimos 45 días del período', '<div class="chart"><canvas id="chE1"></canvas></div>', '', 'consT1')}${cardHtml('📥 Ingresos', 'Período elegido · MovimientosCal', tablaProveedores(movsPeriodo(x, p).map(m => Object.assign({}, m, { prov: m.obs || '(sin detalle)' })), 'bolsas', 0, false, 5), '', 'proveedores')}</div>`;
+  $('esp').innerHTML = `<div class="grid g-21">${cardHtml('📆 Consumo diario', 'Bolsas por día · últimos 45 días del período', '<div class="chart"><canvas id="chE1"></canvas></div>', '', 'consDia')}${cardHtml('📥 Ingresos', 'Período elegido · por proveedor', tablaProveedores(movsPeriodo(x, p), 'bolsas', 0, false, 5), '', 'proveedores')}</div>`;
   grafico('chE1', {
     type: 'bar',
-    data: { labels: s.map(r => fFecha(r.f).slice(0, 5)), datasets: [{ label: 'Consumo', data: s.map(r => r.cons), backgroundColor: colorIns('cal'), borderRadius: 5 }, { label: 'Turno 1', data: s.map(r => r.consT1), type: 'line', borderColor: cv('--s1'), backgroundColor: cv('--s1'), pointRadius: 2.5 }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: ejeX(), y: ejeY(0) } }
+    data: { labels: s.map(r => fFecha(r.f).slice(0, 5)), datasets: [{ label: 'Consumo', data: s.map(r => r.cons), backgroundColor: colorIns('cal'), borderRadius: 5 } ] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: ejeX(), y: ejeY(0) } }
   });
 }
 
@@ -719,7 +830,7 @@ function tablaComparativa(id) {
     ['Días del período', 'dias', 0], [`Consumo [${I.u}/día]`, 'lDia', dec], [`Consumo total [${I.u}]`, 'cons', 0], ['Ingresos [' + I.u + ']', 'ingTotal', 0],
     [`Día pico [${I.u}]`, 'pico', 0], ['Días sin consumo', 'diasSin', 0], ['Variabilidad diaria (CV)', 'cv', 2], ['Stock promedio', 'stockProm', 0], ['Cobertura promedio [días]', 'coberturaProm', 1]
   ];
-  if (id === 'gasoil') filas.push(['Despachos', 'despachos', 0], ['Litros por despacho', 'lDespacho', 1], ['Unidades con consumo', 'unidades', 0], ['Top 3 unidades [%]', 'top3', 1]);
+  if (id === 'gasoil') filas.push(['Despachos', 'despachos', 0], ['Litros por despacho', 'lDespacho', 1], ['Unidades con consumo', 'unidades', 0], ['Concentración: 3 unidades principales [%]', 'top3', 1]);
   if (id === 'tarimas') filas.push(['Descarte [u]', 'descarte', 0], ['Descarte [%]', 'descartePct', 1]);
   if (id === 'stretch') filas.push(['Stretch por pallet [g]', 'grPallet', 0]);
   return `<div class="tw"><table class="comp"><thead><tr><th>Indicador</th>${cols.map(c => `<th class="n">${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${filas.map(f => `<tr><td>${f[0]}</td>${cols.map(c => `<td class="n">${fmt(K[c[0]][f[1]], f[2])}</td>`).join('')}</tr>`).join('')}
@@ -1136,6 +1247,64 @@ function pintarMails() {
   };
 }
 
+function vistaPantalla() {
+  const oc = new Set(uiCfg().ocultos);
+  const sc = ST.uiSc && CAT_UI[ST.uiSc] ? ST.uiSc : 'inicio';
+  ST.uiSc = sc;
+  const it = CAT_UI[sc].items;
+  const grupo = (tit, l) => l.length ? `<h4 class="ui-g">${tit}</h4><div class="ui-lista">${l.map(([vk, n]) => `<label class="ui-it"><input type="checkbox" data-vk="${vk}" ${oc.has(sc + ':' + vk) ? '' : 'checked'}><span>${esc(n)}</span></label>`).join('')}</div>` : '';
+  $('adm').innerHTML = `<div class="card"><div class="card-h"><div class="t"><h3>🧩 Indicadores y gráficos visibles</h3><span class="sub">Destildá lo que no quieras mostrar. Aplica a todos los usuarios, en pantalla y en los informes impresos.</span></div></div>
+    <div class="seg" id="segUi">${Object.keys(CAT_UI).map(k => `<button data-k="${k}" class="${k === sc ? 'on' : ''}">${CAT_UI[k].n}</button>`).join('')}</div>
+    <div id="uiItems" style="margin-top:14px">${grupo('Indicadores (KPI)', it.filter(x => x[0].startsWith('k:')))}${grupo('Gráficos y tablas', it.filter(x => x[0].startsWith('c:')))}</div>
+    <div class="acciones"><button class="btn" id="uiTodo" type="button">Mostrar todo en ${CAT_UI[sc].n}</button><button class="btn pri" id="uiGuardar" type="button">💾 Guardar</button></div></div>`;
+  $('segUi').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.uiSc = b.dataset.k; vistaPantalla(); }; });
+  requestAnimationFrame(() => moverPill($('segUi')));
+  const leer = () => {
+    const l = uiCfg().ocultos.filter(s => !s.startsWith(sc + ':'));
+    $('uiItems').querySelectorAll('input[data-vk]').forEach(c => { if (!c.checked) l.push(sc + ':' + c.dataset.vk); });
+    return l;
+  };
+  $('uiTodo').onclick = () => { $('uiItems').querySelectorAll('input[data-vk]').forEach(c => { c.checked = true; }); };
+  $('uiGuardar').onclick = async ev => {
+    const b = ev.currentTarget, l = leer();
+    b.disabled = true;
+    guardando(true, 'Guardando…');
+    try { toast(await apiPost({ accion: 'guardarUi', ocultos: l }), 'ok'); LS.set('ic_ui', { ocultos: l }); aplicarUiCss(); } catch (err) { toast(err.message, 'bad'); } finally { guardando(false); b.disabled = false; }
+  };
+}
+
+function vistaRoles() {
+  const roles = rolesLista();
+  const P = Object.keys(PERM_TXT);
+  const usados = {};
+  (ST.usuarios || []).forEach(u => { usados[u.rol] = (usados[u.rol] || 0) + 1; });
+  const fila = r => `<tr data-rol="${esc(r.id)}"><td>${r.id === 'admin' ? '<b>🛡️ Administrador</b><br><small class="muted">Todo, incluida la administración</small>' : `<input data-nom value="${esc(r.nombre)}" maxlength="40">`}</td>
+    ${P.map(k => `<td class="c"><input type="checkbox" data-p="${k}" ${r.id === 'admin' || (r.permisos && r.permisos[k]) ? 'checked' : ''} ${r.id === 'admin' ? 'disabled' : ''}></td>`).join('')}
+    <td class="n">${r.id === 'admin' ? '' : `<button class="btn sm pri" data-guardar type="button">💾</button> <button class="btn sm dan" data-borrar type="button" aria-label="Borrar rol">✕</button>`}</td></tr>`;
+  $('adm').innerHTML = `<div class="card"><div class="card-h"><div class="t"><h3>🔑 Roles y permisos</h3><span class="sub">Cada usuario tiene un rol. Los cambios aplican en el próximo ingreso o al actualizar.</span></div></div>
+    <div class="tw"><table class="tabla-roles"><thead><tr><th>Rol</th>${P.map(k => `<th class="c" title="${esc(PERM_TXT[k][1])}">${esc(PERM_TXT[k][0])}</th>`).join('')}<th></th></tr></thead>
+    <tbody>${roles.map(fila).join('')}
+      <tr data-rol="" class="nuevo"><td><input data-nom placeholder="Nombre del nuevo rol" maxlength="40"></td>${P.map(k => `<td class="c"><input type="checkbox" data-p="${k}" ${k === 'informes' || k === 'movimientos' ? 'checked' : ''}></td>`).join('')}<td class="n"><button class="btn sm pri" data-guardar type="button">➕ Agregar</button></td></tr></tbody></table></div>
+    <div class="perm-ayuda">${P.map(k => `<div><b>${esc(PERM_TXT[k][0])}</b><span>${esc(PERM_TXT[k][1])}</span></div>`).join('')}</div>
+    <p class="nota">«Inventarios y ajustes» también se puede dar a un usuario puntual desde Usuarios. Un rol en uso no se puede borrar.</p></div>`;
+  $('adm').querySelectorAll('tr[data-rol]').forEach(tr => {
+    const g = tr.querySelector('[data-guardar]');
+    if (g) g.onclick = async () => {
+      const permisos = {};
+      tr.querySelectorAll('[data-p]').forEach(c => { permisos[c.dataset.p] = c.checked; });
+      g.disabled = true;
+      guardando(true, 'Guardando rol…');
+      try { toast(await apiPost({ accion: 'guardarRol', id: tr.dataset.rol, nombre: tr.querySelector('[data-nom]').value.trim(), permisos }), 'ok'); guardando(false); await cargar(true); vistaRoles(); } catch (err) { toast(err.message, 'bad'); g.disabled = false; } finally { guardando(false); }
+    };
+    const d = tr.querySelector('[data-borrar]');
+    if (d) d.onclick = async () => {
+      if (!confirm('¿Borrar el rol «' + tr.querySelector('[data-nom]').value + '»?')) return;
+      guardando(true, 'Borrando rol…');
+      try { toast(await apiPost({ accion: 'borrarRol', id: tr.dataset.rol }), 'ok'); guardando(false); await cargar(true); vistaRoles(); } catch (err) { toast(err.message, 'bad'); } finally { guardando(false); }
+    };
+  });
+}
+
 function vistaAvisar() {
   $('adm').innerHTML = `<div class="card"><div class="card-h"><div class="t"><h3>📣 Avisar al administrador</h3><span class="sub">Informá un problema, un faltante o cualquier novedad sobre un insumo. Solo lo ve el administrador.</span></div></div>
     <form class="form" id="formAviso" autocomplete="off">
@@ -1292,14 +1461,14 @@ function vistaAdmin() {
   if (!s) { vistaLogin(); return; }
   const secs = ADMIN_SEC.filter(x => (!x.admin || esAdmin()) && (!x.reg || puedeRegistrar()) && (!x.sup || puedeAvisar()));
   if (!secs.find(x => x.id === ST.admSec)) ST.admSec = puedeRegistrar() ? 'registrar' : puedeAvisar() ? 'avisar' : 'cuenta';
-  const rolTxt = (ROL_TXT[s.rol] || s.rol) + (s.rol === 'operador' && s.verInventario ? ' · ve inventarios' : '');
+  const rolTxt = rolNombre(s.rol);
   app().innerHTML = `<section class="vista">
     <div class="hero"><div><div class="eyebrow">👤 ${esc(s.nombre || s.usuario)} · ${rolTxt}</div><h1>Admini<span>stración</span></h1><p class="sub">Todo lo que modifica las planillas está acá. Cada acción queda registrada con tu usuario.</p></div>
       <div class="seg" id="segAdm">${secs.map(x => `<button data-sec="${x.id}" class="${x.id === ST.admSec ? 'on' : ''}"><span>${x.e}</span>${x.n}</button>`).join('')}</div></div>
     <div id="adm"></div></section>`;
   $('segAdm').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.admSec = b.dataset.sec; vistaAdmin(); }; });
   requestAnimationFrame(() => moverPill($('segAdm')));
-  const v = { registrar: vistaRegistrar, mails: vistaMails, avisar: vistaAvisar, avisos: vistaAvisos, reposicion: vistaReposicion, usuarios: vistaUsuarios, conexion: vistaConexion, cuenta: vistaCuenta }[ST.admSec];
+  const v = { registrar: vistaRegistrar, mails: vistaMails, pantalla: vistaPantalla, roles: vistaRoles, avisar: vistaAvisar, avisos: vistaAvisos, reposicion: vistaReposicion, usuarios: vistaUsuarios, conexion: vistaConexion, cuenta: vistaCuenta }[ST.admSec];
   v();
 }
 
@@ -1319,8 +1488,8 @@ function pintarUsuarios() {
   const yo = sesion().usuario;
   $('listaU').innerHTML = `<div class="tabla-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Ver inventarios</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead><tbody>${ST.usuarios.map((u, i) => `<tr class="${u.activo ? '' : 'inactivo'}">
       <td><b>${esc(u.nombre || u.usuario)}</b><br><small class="muted">${esc(u.usuario)}${u.usuario === yo ? ' · vos' : ''}</small></td>
-      <td><span class="tag ${u.rol === 'admin' ? 't-acc' : (u.rol === 'compras' || u.rol === 'supervisor') ? 't-info' : 't-mut'}">${{ admin: '🛡️', compras: '🛒', operador: '🧰', supervisor: '📋' }[u.rol] || ''} ${ROL_TXT[u.rol] || u.rol}</span></td>
-      <td>${u.rol !== 'operador' ? '<span class="muted">Siempre</span>' : `<label class="switch"><input type="checkbox" data-inv="${i}" ${u.verInventario ? 'checked' : ''}><span></span></label>`}</td>
+      <td><span class="tag ${u.rol === 'admin' ? 't-acc' : 't-info'}">${u.rol === 'admin' ? '🛡️ ' : ''}${esc(rolNombre(u.rol))}</span></td>
+      <td>${rolTieneInv(u.rol) ? '<span class="muted">Por su rol</span>' : `<label class="switch"><input type="checkbox" data-inv="${i}" ${u.verInvPropio || u.verInventario ? 'checked' : ''}><span></span></label>`}</td>
       <td>${u.activo ? '🟢 Activo' : '⚪ Inactivo'}</td>
       <td><small>${esc(u.ultimo || '—')}</small></td>
       <td class="n"><button class="btn sm" data-edit="${i}">✏️ Editar</button></td></tr>`).join('')}</tbody></table></div>`;
@@ -1331,11 +1500,13 @@ function pintarUsuarios() {
       c.disabled = true;
       try {
         toast(await apiPost({ accion: 'guardarUsuario', usuarioId: u.usuario, nombre: u.nombre, rol: u.rol, verInventario: c.checked, activo: u.activo }), 'ok');
-        u.verInventario = c.checked;
+        u.verInventario = c.checked; u.verInvPropio = c.checked;
       } catch (err) { c.checked = !c.checked; toast(err.message, 'bad'); } finally { c.disabled = false; }
     };
   });
 }
+
+function rolTieneInv(id) { const r = rolesLista().find(x => x.id === id); return id === 'admin' || !!(r && r.permisos && r.permisos.inventario); }
 
 function formUsuario(u) {
   const nuevo = !u;
@@ -1344,20 +1515,20 @@ function formUsuario(u) {
     <form class="form" id="formU" autocomplete="off">
       <label class="f">Usuario<input id="uId" type="text" maxlength="40" required autocapitalize="none" spellcheck="false" placeholder="ej. jperez" value="${esc(u.usuario)}" ${nuevo ? '' : 'readonly'}></label>
       <label class="f">Nombre y apellido<input id="uNom" type="text" maxlength="60" required value="${esc(u.nombre || '')}"></label>
-      <label class="f">Rol<select id="uRol"><option value="operador" ${u.rol === 'operador' ? 'selected' : ''}>🧰 Operador · registra movimientos</option><option value="compras" ${u.rol === 'compras' ? 'selected' : ''}>🛒 Responsable de Compras · informes, movimientos e inventarios</option><option value="supervisor" ${u.rol === 'supervisor' ? 'selected' : ''}>📋 Supervisor · informes, movimientos y avisos al administrador</option><option value="admin" ${u.rol === 'admin' ? 'selected' : ''}>🛡️ Administrador · todo</option></select></label>
+      <label class="f">Rol<select id="uRol">${rolesLista().map(r => `<option value="${esc(r.id)}" ${u.rol === r.id ? 'selected' : ''}>${r.id === 'admin' ? '🛡️ ' : ''}${esc(r.nombre)}</option>`).join('')}</select></label>
       <label class="f">${nuevo ? 'Clave inicial' : 'Nueva clave'}<input id="uClave" type="password" minlength="6" ${nuevo ? 'required' : ''} autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label>
-      <label class="chk full"><input type="checkbox" id="uInv" ${u.verInventario || u.rol !== 'operador' ? 'checked' : ''}> <span>📋 Puede ver inventarios físicos vs. sistema</span></label>
+      <label class="chk full"><input type="checkbox" id="uInv" ${u.verInvPropio || u.verInventario ? 'checked' : ''}> <span>📋 Puede ver inventarios físicos vs. sistema (además de lo que permita su rol)</span></label>
       <label class="chk full"><input type="checkbox" id="uAct" ${u.activo ? 'checked' : ''}> <span>🟢 Usuario activo (desmarcá para bloquear el acceso)</span></label>
       <div class="full acciones" style="margin-top:0">${nuevo ? '' : '<button class="btn" type="button" id="uCancel">Cancelar</button>'}<button class="btn pri" type="submit">💾 ${nuevo ? 'Crear usuario' : 'Guardar cambios'}</button></div>
     </form>`;
-  const sync = () => { const fijo = $('uRol').value !== 'operador'; $('uInv').disabled = fijo; if (fijo) $('uInv').checked = true; };
+  const sync = () => { const fijo = rolTieneInv($('uRol').value); $('uInv').disabled = fijo; if (fijo) $('uInv').checked = true; };
   $('uRol').onchange = sync; sync();
   if (!nuevo) $('uCancel').onclick = () => formUsuario(null);
   $('formU').onsubmit = async e => {
     e.preventDefault();
     guardando(true, 'Guardando usuario…');
     try {
-      const msg = await apiPost({ accion: 'guardarUsuario', usuarioId: $('uId').value.trim().toLowerCase(), nombre: $('uNom').value.trim(), rol: $('uRol').value, verInventario: $('uInv').checked, activo: $('uAct').checked, clave: $('uClave').value || undefined });
+      const msg = await apiPost({ accion: 'guardarUsuario', usuarioId: $('uId').value.trim().toLowerCase(), nombre: $('uNom').value.trim(), rol: $('uRol').value, verInventario: rolTieneInv($('uRol').value) ? false : $('uInv').checked, activo: $('uAct').checked, clave: $('uClave').value || undefined });
       toast(msg, 'ok');
       vistaUsuarios();
     } catch (err) { toast(err.message, 'bad'); } finally { guardando(false); }
@@ -1367,7 +1538,7 @@ function formUsuario(u) {
 function vistaCuenta() {
   const s = sesion();
   $('adm').innerHTML = `<div class="grid g2"><div class="card"><div class="card-h"><div class="t"><h3>👤 Mi sesión</h3><span class="sub">Vence a las ${new Date(s.vence).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}.</span></div></div>
-      <dl class="datos-u"><dt>Usuario</dt><dd>${esc(s.usuario)}</dd><dt>Nombre</dt><dd>${esc(s.nombre || '—')}</dd><dt>Rol</dt><dd>${ROL_TXT[s.rol] || s.rol}</dd><dt>Inventarios</dt><dd>${s.verInventario ? '📋 Autorizado' : '🚫 Sin autorización'}</dd></dl>
+      <dl class="datos-u"><dt>Usuario</dt><dd>${esc(s.usuario)}</dd><dt>Nombre</dt><dd>${esc(s.nombre || '—')}</dd><dt>Rol</dt><dd>${esc(rolNombre(s.rol))}</dd><dt>Inventarios</dt><dd>${s.verInventario ? '📋 Autorizado' : '🚫 Sin autorización'}</dd></dl>
       <button class="btn dan" id="btnSalir2">🚪 Cerrar sesión</button></div>
     <div class="card"><div class="card-h"><div class="t"><h3>🔑 Cambiar clave</h3><span class="sub">Mínimo 6 caracteres.</span></div></div>
       <form class="form" id="formClave" autocomplete="off"><label class="f full">Clave actual<input id="cAct" type="password" required autocomplete="current-password"></label><label class="f">Nueva clave<input id="cNue" type="password" minlength="6" required autocomplete="new-password"></label><label class="f">Repetir nueva clave<input id="cRep" type="password" minlength="6" required autocomplete="new-password"></label>
@@ -1432,7 +1603,8 @@ function glosarioInforme(claves) {
   return `<div class="inf-glos-wrap"><h3 class="inf-h">Abreviaturas y criterios</h3><dl class="inf-glos">${l.map(g => `<dt>${esc(g[0])}</dt><dd>${esc(g[1])}</dd>`).join('')}</dl></div>`;
 }
 
-function infKpi(l, v, sub, cls) { return `<div class="inf-kpi ${cls || ''}"><span>${l}</span><b>${v}</b><small>${sub || '&nbsp;'}</small></div>`; }
+const LBL2K = { 'consumo diario': 'lDia', 'por día operativo': 'lDiaOp', 'consumo total': 'cons', 'ingresos netos': 'ing', 'stock promedio': 'stockProm', 'días bajo ss': 'diasSS', 'consumo / ingresos por semana': 'sem', 'descarte': 'descarte', 'inventario vs. sistema': 'difInv', 'stretch por pallet': 'grPallet', 'bobinas por día': 'bobDia', 'kg por bobina recibida': 'kgBob', 'despachos': 'despachos', 'unidades con consumo': 'unidades' };
+function infKpi(l, v, sub, cls) { const kk = LBL2K[normCol(l)]; return `<div class="inf-kpi ${cls || ''}"${kk ? ` data-vk="k:${kk}"` : ''}><span>${l}</span><b>${v}</b><small>${sub || '&nbsp;'}</small></div>`; }
 
 function graficoStockInf(cid, id, p) {
   const x = ST.modelo[id], ci = colorIns(id);
@@ -1513,7 +1685,7 @@ function informeGeneral(pid, pre) {
     const l = [['Consumo diario', fmt(k.lDia, I.dec) + ' ' + I.u], ['Consumo por semana', fmt(sem.cons, I.dec) + ' ' + I.u], ['Ingresos por semana', fmt(sem.ing, I.dec) + ' ' + I.u], ['Día pico', fmt(k.pico) + ' (' + (k.fechaPico ? fFecha(k.fechaPico).slice(0, 5) : '—') + ')']];
     if (id === 'tarimas') { l.push(['Descarte', pct(k.descartePct)]); if (vi) l.push(['Inventario vs. sistema', pct(k.difInv)]); }
     if (id === 'stretch') { l.push(['Stretch por pallet', fmt(k.grPallet) + ' g']); if (vi) l.push(['Inventario vs. sistema', pct(k.difInv)]); }
-    if (id === 'gasoil') l.push(['Despachos', fmt(k.despachos)], ['Top 3 unidades', pct(k.top3)]);
+    if (id === 'gasoil') l.push(['Despachos', fmt(k.despachos)], ['3 unidades principales', pct(k.top3) + ' del consumo']);
     return l.map(x => `<div><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
   };
   const bloques = ORDEN.map(id => `<div class="inf-bloque" style="--c:var(--c-${id})"><h4>${INSUMOS[id].ico} ${INSUMOS[id].nombre}</h4><div class="inf-claves">${claves(id)}</div><div class="inf-chart"><canvas id="${pre}-st-${id}"></canvas></div></div>`).join('');
@@ -1552,9 +1724,7 @@ function informeInsumo(id, pid, pre) {
   ks.splice(4, 0, infKpi(`Consumo / ingresos por semana [${u}]`, `${fmt(sem.cons, dec)} / ${fmt(sem.ing, dec)}`, sem.dias < 84 ? `últimos ${sem.dias} días` : 'últimas 12 semanas'));
   if (id === 'tarimas') { ks.push(infKpi('Descarte [u]', fmt(k.descarte), pct(k.descartePct) + ' de las usadas')); if (vi) ks.push(infKpi('Inventario vs. sistema', pct(k.difInv), `${fmt(k.inventarios)} inventarios`)); }
   if (id === 'stretch') { ks.push(infKpi('Stretch por pallet', fmt(k.grPallet) + ' g', 'Kg ÷ tarimas consumidas'), infKpi('Bobinas por día', fmt(k.bobDia, 1), ''), infKpi('Kg por bobina recibida', fmt(k.kgBobina, 1), '')); if (vi) ks.push(infKpi('Inventario vs. sistema', pct(k.difInv), `${fmt(k.inventarios)} inventarios`)); }
-  if (id === 'gasoil') ks.push(infKpi('Despachos', fmt(k.despachos), `${fmt(k.lDespacho, 1)} L por despacho`), infKpi('Unidades con consumo', fmt(k.unidades), `Top 3: ${pct(k.top3)} del consumo`));
-  if (id === 'cal') { const t1 = sumar(x.serie.filter(r => r.f >= p.a && r.f <= p.b), 'consT1'); ks.push(infKpi('Consumo turno 1 [bolsas/día]', fmt(k.diasDatos ? t1 / k.diasDatos : null, 1), pct(k.cons ? 100 * t1 / k.cons : null) + ' del total')); }
-  if (vi && id !== 'gasoil') ks.push(infKpi('Ajuste por controles 6:00', fmt(k.ajusteTotal), `${fmt(k.controles)} controles · uso interno`));
+  if (id === 'gasoil') ks.push(infKpi('Despachos', fmt(k.despachos), `${fmt(k.lDespacho, 1)} L por despacho`), infKpi('Unidades con consumo', fmt(k.unidades), `las 3 que más cargaron: ${pct(k.top3)} del total`));
   let esp = '';
   if (id === 'tarimas') {
     esp = `<div class="inf-sec"><h3 class="inf-h">5 · Ingresos por proveedor</h3>${tablaProveedores(movsPeriodo(x, p).filter(m => m.tipo === 'Ingreso' || m.tipo === 'Devolución'), 'u', 0)}</div>`;
@@ -1566,7 +1736,7 @@ function informeInsumo(id, pid, pre) {
     esp = `<div class="inf-sec"><h3 class="inf-h">5 · Consumo por departamento</h3><div class="inf-gas"><div>${tablaDeptosGasoil(p, P)}</div><div class="inf-chart alto"><canvas id="${pre}-dep"></canvas></div></div></div>
       <h3 class="inf-h">6 · Consumo diario promedio por unidad</h3>${tablaUnidadesGasoil(p, P, { top: 99 })}`;
   } else {
-    esp = `<div class="inf-sec"><h3 class="inf-h">5 · Ingresos</h3>${tablaProveedores(movsPeriodo(x, p).map(m => Object.assign({}, m, { prov: m.obs || '(sin detalle)' })), 'bolsas', 0)}</div>`;
+    esp = `<div class="inf-sec"><h3 class="inf-h">5 · Ingresos</h3>${tablaProveedores(movsPeriodo(x, p), 'bolsas', 0)}</div>`;
   }
   const claves = ['SS', 'PP', 'Cobertura', 'Consumo medio', 'CV', 'Día operativo', '2025* · 2026*', 'T1 a T4 (trimestres)', 'Var.', 'Comp.', 'Part.', u === 'u' ? 'u' : u === 'kg' ? 'kg' : u === 'L' ? 'L' : ''];
   if (id === 'stretch') claves.push('bob.');
@@ -1592,7 +1762,9 @@ function tablaInventarioInf(x, p, u) {
 }
 
 function construirInforme(scope, pid, pre) {
-  return scope === 'general' ? informeGeneral(pid, pre) : informeInsumo(scope, pid, pre);
+  const r = scope === 'general' ? informeGeneral(pid, pre) : informeInsumo(scope, pid, pre);
+  r.html = `<div data-vkscope="${scope}">${r.html}</div>`;
+  return r;
 }
 
 function imprimir(scope, pid) {
@@ -1670,7 +1842,7 @@ function render() {
   const v = ST.vista;
   if (v === 'resumen') vistaResumen();
   else if (INSUMOS[v]) vistaInsumo(v);
-  else if ((v === 'informe' || v === 'movimientos') && !verReportes()) vistaRestringida(v);
+  else if ((v === 'informe' && !verInformes()) || (v === 'movimientos' && !verMovimientos())) vistaRestringida(v);
   else if (v === 'informe') vistaInforme();
   else if (v === 'movimientos') vistaMovimientos();
   else if (v === 'admin') vistaAdmin();
@@ -1715,6 +1887,7 @@ function aplicar(d, desdeCache) {
 }
 
 function init() {
+  aplicarUiCss();
   ST.per = LS.get('ic_per2', 'rango');
   $('btnTema').innerHTML = icoTema(); $('btnRefrescar').innerHTML = ICO.refrescar;
   $('btnTema').onclick = alternarTema;

@@ -933,3 +933,15 @@ tr.tenue td { color: var(--faint); font-size: .8rem; }
 .tabla-mails td { padding: 6px 4px; vertical-align: middle; }
 .tabla-mails td.c, .tabla-mails th.c { text-align: center; }
 .tabla-mails input[type=email], .tabla-mails input:not([type]) { min-width: 140px; }
+
+.ui-g { margin: 14px 0 8px; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.ui-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.ui-it { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); font-weight: 600; font-size: .88rem; cursor: pointer; }
+.ui-it input, .tabla-roles input[type=checkbox] { width: auto; }
+.tabla-roles td, .tabla-roles th { vertical-align: middle; }
+.tabla-roles th.c, .tabla-roles td.c { text-align: center; }
+.tabla-roles tr.nuevo td { background: var(--panel-2); }
+.perm-ayuda { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 12px; }
+.perm-ayuda div { font-size: .8rem; display: flex; flex-direction: column; gap: 2px; }
+.perm-ayuda span { color: var(--muted); }
+.vk-dib { display: contents; }

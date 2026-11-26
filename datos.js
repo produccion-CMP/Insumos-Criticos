@@ -50,6 +50,8 @@ async function apiGet(fresco) {
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'Error al leer los datos');
   if (j.usuarios) { LS.set('ic_usrs', j.usuarios); ST.usrsFrescos = true; }
+  if (j.roles) LS.set('ic_roles', j.roles);
+  if (j.ui) { LS.set('ic_ui', j.ui); aplicarUi(); }
   if (ses) {
     if (!j.perfil) { LS.set('ic_ses', null); if (window.onSesionVencida) window.onSesionVencida(); }
     else LS.set('ic_ses', Object.assign({}, ses, j.perfil));
@@ -62,11 +64,22 @@ function sesion() {
   return s && s.token && s.vence > Date.now() ? s : null;
 }
 const ROL_TXT = { admin: 'Administrador', operador: 'Operador', compras: 'Responsable de Compras', supervisor: 'Supervisor' };
+const PERM_DEF = { operador: { registrar: true, informes: true, movimientos: true }, compras: { inventario: true, informes: true, movimientos: true }, supervisor: { informes: true, movimientos: true, avisar: true } };
+const PERM_TXT = { registrar: ['Registrar movimientos', 'Cargar ingresos, envíos, consumos, descartes, controles 6:00 y gasoil'], inventario: ['Inventarios y ajustes', 'Ver y cargar inventarios físicos, controles y ajustes contra el sistema'], informes: ['Informes', 'Ver, imprimir y descargar informes'], movimientos: ['Movimientos', 'Ver el listado de movimientos'], avisar: ['Avisos al administrador', 'Enviar observaciones o problemas que solo ve el administrador'] };
+const rolesLista = () => LS.get('ic_roles', null) || [{ id: 'admin', nombre: 'Administrador', fijo: true, permisos: {} }].concat(Object.keys(PERM_DEF).map(k => ({ id: k, nombre: ROL_TXT[k], permisos: PERM_DEF[k] })));
+const rolNombre = id => { const r = rolesLista().find(x => x.id === id); return r ? r.nombre : (ROL_TXT[id] || id); };
+const permiso = k => { const s = sesion(); if (!s) return false; if (s.rol === 'admin') return true; const p = s.permisos || PERM_DEF[s.rol] || {}; return !!p[k]; };
 const esAdmin = () => { const s = sesion(); return !!(s && s.rol === 'admin'); };
-const puedeRegistrar = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.rol === 'operador')); };
-const verInventario = () => { const s = sesion(); return !!(s && (s.rol === 'admin' || s.rol === 'compras' || s.verInventario)); };
-const verReportes = () => !!sesion();
-const puedeAvisar = () => { const s = sesion(); return !!(s && s.rol === 'supervisor'); };
+const puedeRegistrar = () => permiso('registrar');
+const verInventario = () => { const s = sesion(); return !!(s && (permiso('inventario') || s.verInventario)); };
+const verInformes = () => permiso('informes');
+const verMovimientos = () => permiso('movimientos');
+const verReportes = () => verInformes() || verMovimientos();
+const puedeAvisar = () => { const s = sesion(); return !!(s && s.rol !== 'admin' && permiso('avisar')); };
+
+const uiCfg = () => LS.get('ic_ui', null) || { ocultos: [] };
+const oculto = (vk, ins) => { const o = uiCfg().ocultos; return o.indexOf((ins || ST.vkIns || '*') + ':' + vk) >= 0 || o.indexOf('*:' + vk) >= 0; };
+function aplicarUi() { if (typeof aplicarUiCss === 'function' && typeof document !== 'undefined' && document.head) aplicarUiCss(); }
 
 async function apiPost(payload) {
   const { url, key } = conexion();
@@ -104,7 +117,7 @@ function construirModelo(D) {
 
   M.cal = {
     serie: D.cal.diario.map(r => ({ f: r[0], ini: r[1], ing: r[2] || 0, env: 0, cons: r[3] || 0, sist: r[4], ctrl: r[5], consT1: r[6], aj: r[7], stock: r[8] })),
-    movs: D.cal.movs.map(r => ({ hoja: 'movCal', fila: r[0], f: r[1], cant: r[2], prov: '', obs: r[3], tipo: r[2] < 0 ? 'Devolución' : 'Ingreso' }))
+    movs: D.cal.movs.map(r => ({ hoja: 'movCal', fila: r[0], f: r[1], cant: r[2], prov: r.length > 4 ? r[3] : '', obs: r.length > 4 ? r[4] : r[3], tipo: r[2] < 0 ? 'Devolución' : 'Ingreso' }))
   };
 
   const ultDep = {};
@@ -387,7 +400,9 @@ function kpis(id, p) {
     k.mediciones = son.length;
     const porU = {};
     tx.forEach(t => { porU[t.u] = (porU[t.u] || 0) + t.l; });
-    k.top3 = k.cons ? 100 * sumar(Object.values(porU).sort((x, y) => y - x).slice(0, 3)) / k.cons : null;
+    const top = Object.entries(porU).sort((x, y) => y[1] - x[1]).slice(0, 3);
+    k.top3 = k.cons ? 100 * sumar(top.map(t => t[1])) / k.cons : null;
+    k.top3Nombres = top.map(t => t[0]);
     k.difSonda = son.length ? sumar(son, 'aj') / son.length : null;
   }
   return k;

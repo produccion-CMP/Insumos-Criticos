@@ -149,3 +149,12 @@ En Administración › Reposición, por insumo: consumo medio, σ diaria, lead t
 - **Mails automáticos** (Administración › Mails): resumen semanal (día y hora), alertas de punto de pedido y de stock de seguridad (días, hora, repetición y horizonte), destinatarios con selección por tipo de mail y envío de prueba.
 - Archivos de Apps Script: `Code.gs`, `Modelo.gs` (generado desde datos.js con `python3 tools/build_modelo.py datos.js apps-script/Modelo.gs`), `Mails.gs` y `appsscript.json`, que ahora incluye el permiso para enviar mails.
 - Después de publicar, ejecutar `instalar` una vez: crea el activador horario de mails.
+
+## v12
+
+- `autorizarMails()` en Code.gs: ejecutarla una vez desde el editor para otorgar el permiso de envío de mails. Después, publicar una nueva versión de la implementación.
+- MovimientosCal: A Fecha, B Cantidad, C Proveedor, D Obs.
+- Se quitaron «Consumo turno 1» (cal) y «Ajuste por controles 6:00» (informe). «Top 3 unidades» pasa a llamarse «Concentración: 3 unidades principales».
+- Modo Ayuda: también explica las columnas de las tablas y las filas de la comparativa.
+- Administración › Indicadores: elegir qué KPI, gráficos y tablas se muestran en Inicio y en cada insumo (pantalla e informe). Se guarda en la propiedad UI_CFG.
+- Administración › Roles: permisos por rol (registrar, inventarios y ajustes, informes, movimientos, avisos) y roles nuevos. Se guarda en la propiedad ROLES_CFG. Administrador fijo.
