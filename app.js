@@ -523,6 +523,7 @@ const AYUDA_COL = {
   'ver inventarios': 'Puede ver y cargar inventarios físicos y ajustes.',
   'rol': 'Tipo de usuario, que define qué puede ver y hacer.',
   'insumo': 'Insumo crítico.',
+  'insumos': 'Insumos sobre los que el destinatario recibe mails. Los demás no aparecen en sus correos.',
   'indicador': 'Nombre del indicador.'
 };
 
@@ -1201,7 +1202,9 @@ function pintarMails() {
   const DS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const hs = sel => Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === sel ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
   const ult = k => info.ult && info.ult[k] ? fFecha(info.ult[k]) : 'nunca';
+  const insD = d => Array.isArray(d.insumos) && d.insumos.length ? d.insumos : ORDEN;
   const fila = (d, i) => `<tr data-i="${i}"><td><input data-d="nombre" value="${esc(d.nombre)}" placeholder="Nombre"></td><td><input data-d="email" type="email" value="${esc(d.email)}" placeholder="correo@empresa.com"></td>
+    <td><div class="ins-chk">${ORDEN.map(id => `<label title="${INSUMOS[id].nombre}"><input type="checkbox" data-ins="${id}" ${insD(d).indexOf(id) >= 0 ? 'checked' : ''}>${INSUMOS[id].nombre}</label>`).join('')}</div></td>
     ${['semanal', 'pp', 'ss', 'activo'].map(k => `<td class="c"><input type="checkbox" data-d="${k}" ${d[k] ? 'checked' : ''}></td>`).join('')}<td><button class="btn sm dan" data-quitar="${i}" type="button" aria-label="Quitar">✕</button></td></tr>`;
   $('adm').innerHTML = `
     <div class="grid g2">
@@ -1215,8 +1218,8 @@ function pintarMails() {
           <label class="f">Repetir cada (días) · 0 = solo al cruzar<input type="number" id="mAlRep" min="0" max="30" step="1" value="${c.alertas.repetir}"></label>
           <label class="f full">Horizonte de proyección (días) · 0 = lead time de cada insumo<input type="number" id="mAlHor" min="0" max="90" step="1" value="${c.alertas.horizonte}"></label></div></div>
     </div>
-    <div class="card" style="margin-top:14px"><div class="card-h"><div class="t"><h3>👥 Destinatarios</h3><span class="sub">Marcá qué mails recibe cada persona.</span></div><button class="btn" id="mAgregar" type="button">➕ Agregar</button></div>
-      <div class="tw"><table class="tabla-mails"><thead><tr><th>Nombre</th><th>Correo</th><th class="c">Semanal</th><th class="c">Alerta PP</th><th class="c">Alerta SS</th><th class="c">Activo</th><th></th></tr></thead>
+    <div class="card" style="margin-top:14px"><div class="card-h"><div class="t"><h3>👥 Destinatarios</h3><span class="sub">Marcá de qué insumos y qué mails recibe cada persona. Solo verá los insumos tildados.</span></div><button class="btn" id="mAgregar" type="button">➕ Agregar</button></div>
+      <div class="tw"><table class="tabla-mails"><thead><tr><th>Nombre</th><th>Correo</th><th>Insumos</th><th class="c">Semanal</th><th class="c">Alerta PP</th><th class="c">Alerta SS</th><th class="c">Activo</th><th></th></tr></thead>
       <tbody id="mDest">${c.destinatarios.map(fila).join('') || ''}</tbody></table></div>
       ${c.destinatarios.length ? '' : '<p class="nota">Todavía no hay destinatarios.</p>'}
       <label class="f" style="margin-top:12px">Enlace de la aplicación (botón «Abrir la aplicación» del mail)<input id="mUrl" type="url" value="${esc(c.urlApp)}" placeholder="https://…"></label>
@@ -1229,9 +1232,9 @@ function pintarMails() {
     urlApp: $('mUrl').value.trim(),
     semanal: { activo: $('mSemAct').checked, dia: +$('mSemDia').value, hora: +$('mSemHora').value },
     alertas: { activo: $('mAlAct').checked, dias: Array.from($('adm').querySelectorAll('[data-dia]:checked')).map(i => +i.dataset.dia), hora: +$('mAlHora').value, repetir: +$('mAlRep').value || 0, horizonte: +$('mAlHor').value || 0 },
-    destinatarios: Array.from($('mDest').querySelectorAll('tr')).map(tr => { const g = k => tr.querySelector(`[data-d="${k}"]`); return { nombre: g('nombre').value.trim(), email: g('email').value.trim(), semanal: g('semanal').checked, pp: g('pp').checked, ss: g('ss').checked, activo: g('activo').checked }; })
+    destinatarios: Array.from($('mDest').querySelectorAll('tr')).map(tr => { const g = k => tr.querySelector(`[data-d="${k}"]`); return { nombre: g('nombre').value.trim(), email: g('email').value.trim(), insumos: Array.from(tr.querySelectorAll('[data-ins]:checked')).map(c => c.dataset.ins), semanal: g('semanal').checked, pp: g('pp').checked, ss: g('ss').checked, activo: g('activo').checked }; })
   });
-  $('mAgregar').onclick = () => { ST.mails.cfg = leer(); ST.mails.cfg.destinatarios.push({ nombre: '', email: '', semanal: true, pp: true, ss: true, activo: true }); pintarMails(); };
+  $('mAgregar').onclick = () => { ST.mails.cfg = leer(); ST.mails.cfg.destinatarios.push({ nombre: '', email: '', insumos: ORDEN.slice(), semanal: true, pp: true, ss: true, activo: true }); pintarMails(); };
   $('adm').querySelectorAll('[data-quitar]').forEach(b => { b.onclick = () => { ST.mails.cfg = leer(); ST.mails.cfg.destinatarios.splice(+b.dataset.quitar, 1); pintarMails(); }; });
   $('mGuardar').onclick = async ev => {
     const b = ev.currentTarget;
