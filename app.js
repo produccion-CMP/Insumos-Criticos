@@ -35,6 +35,7 @@ const ADMIN_SEC = [
   { id: 'avisar', e: '📣', n: 'Avisar', admin: false, sup: true },
   { id: 'avisos', e: '📬', n: 'Avisos', admin: true },
   { id: 'reposicion', e: '🛒', n: 'Reposición', admin: true },
+  { id: 'mails', e: '✉️', n: 'Mails', admin: true },
   { id: 'usuarios', e: '👥', n: 'Usuarios', admin: true },
   { id: 'conexion', e: '🔌', n: 'Conexión', admin: true },
   { id: 'cuenta', e: '👤', n: 'Mi cuenta', admin: false }
@@ -365,7 +366,7 @@ const AYUDA = {
   consT1: ['Consumo del turno 1', 'Bolsas consumidas en el turno 1 (22:00 a 6:00) por día, según el Informe de Producción, y su parte del consumo total.'],
   ajustes: ['Ajustes por control físico e inventario', 'Control de las 6:00: contado − stock del sistema a esa hora. Inventario: (sistema − físico) ÷ sistema. Solo lo ven administradores, Responsable de Compras y usuarios autorizados.'],
   movsIns: ['Últimos movimientos', 'Ingresos, envíos, descartes y cargas más recientes del insumo. «Ver todos» abre el historial completo.'],
-  ing: ['Ingresos', 'Suma de lo recibido de proveedores en el período. Entregas: cantidad de remitos con ingreso. Por entrega: ingresos ÷ entregas.'],
+  ing: ['Ingresos', 'Ingresos netos del período: lo recibido de proveedores menos lo devuelto. Cada devolución se descuenta del último ingreso anterior (del mismo proveedor si existe), así el neto nunca supera lo recibido ni queda negativo. Entregas: remitos con ingreso. Por entrega: neto ÷ entregas.'],
   stockProm: ['Stock y cobertura promedio', 'Stock promedio: promedio del stock de fin de día del período. Cobertura promedio = stock promedio ÷ consumo diario promedio del período: cuántos días de consumo había en depósito. Mínimo: el stock más bajo registrado.'],
   diasSS: ['Días bajo stock de seguridad', 'Días en que el stock de fin de día quedó por debajo del stock de seguridad (SS) vigente hoy.'],
   descarte: ['Descarte de tarimas', 'Tarimas rotas o no aptas. Porcentaje = descartadas ÷ (consumidas + descartadas).'],
@@ -509,7 +510,7 @@ function vistaInsumo(id) {
     kpiHtml('📉', 'Consumo diario', fmt(k.lDia, dec), u + '/día', cmp || 'Consumo ÷ días calendario', '', 'lDia'),
     kpiHtml('🏭', 'Por día operativo', fmt(k.lDiaOp, dec), u + '/día', `${fmt(k.diasConsumo)} días con consumo`, '', 'lDiaOp'),
     kpiHtml('🔥', 'Consumo total', fmt(k.cons), u, `Pico ${fmt(k.pico, dec)} el ${fFecha(k.fechaPico)}`, '', 'cons'),
-    kpiHtml('📥', 'Ingresos', fmt(k.ingTotal), u, `${fmt(k.entregas)} entregas · ${fmt(k.entregaProm, dec)} por entrega`, '', 'ing'),
+    kpiHtml('📥', 'Ingresos', fmt(k.ingTotal), u, `${fmt(k.entregas)} entregas · ${fmt(k.entregaProm, dec)} por entrega${k.ingDevuelto ? ' · ↩️ ' + fmt(k.ingDevuelto, dec) + ' devuelto' : ''}`, '', 'ing'),
     kpiHtml('📦', 'Stock promedio', fmt(k.stockProm), u, `⏳ Cobertura promedio <b>${fmt(k.coberturaProm, 1)} días</b> · mínimo ${fmt(k.stockMin)}`, '', 'stockProm'),
     kpiHtml('🚨', 'Días bajo SS', fmt(k.diasBajoSS), 'días', `de ${fmt(k.diasConStock)} con stock registrado`, k.diasBajoSS > 0 ? 'bad' : 'ok', 'diasSS')
   ];
@@ -960,85 +961,179 @@ function filtrarMov() {
 
 function vistaReposicion() {
   const M = ST.modelo;
-  $('adm').innerHTML = `<p class="sub" style="margin-bottom:14px">Método estadístico: SS = z·σ·√LT + consumo·(LT máx − LT) · PP = consumo·LT + SS · Stock máximo = el que definas (vacío: PP + consumo·ciclo) · Pedir = stock máximo − stock, redondeado al múltiplo de pedido. Los valores se calculan al instante; «Aplicar» los copia a los días de SS y PP vigentes.</p>
-    <div class="param-grid stagger">${ORDEN.map((id, i) => {
-      const x = M[id], I = INSUMOS[id], e = x.est;
-      const num = (k, v, st) => `<input type="number" min="0" step="${st}" value="${v === null || v === undefined ? '' : v}" data-e="${k}" inputmode="decimal">`;
-      return `<div class="card param" style="--c:var(--c-${id});--c2:var(--c-${id}-2);--i:${i}" data-id="${id}">
-        <div class="ins-cab"><span class="ins-ico">${I.ico}</span><div><h3>${I.nombre}</h3><div class="sub">Datos de los últimos ${I.medio.dias} días</div></div>${x.paramGuardado ? '' : '<span class="tag t-mut">por defecto</span>'}</div>
-        <div class="calc c2"><div><span>Consumo medio</span><b>${fmt(x.medio, I.dec)}</b><small>${I.u}/día</small></div><div><span>σ diaria</span><b>${fmt(x.sigma, I.dec)}</b><small>${I.u}/día</small></div></div>
-        <div class="est-grid">
-          <label class="f">Lead time normal (días)${num('ltN', e.ltN, 0.5)}</label>
-          <label class="f">Lead time máximo (días)${num('ltMax', e.ltMax, 0.5)}</label>
-          <label class="f">Nivel de servicio (%)${num('nivel', e.nivel, 0.1)}</label>
-          <label class="f">Ciclo de pedido (días)${num('ciclo', e.ciclo, 1)}</label>
-          <label class="f full">Stock máximo (${I.u}) · vacío = teórico${num('max', x.stockMax, 1)}</label>
-          <label class="f">Pedir en<select data-e="unidad">${unidadesPedido(id).map(o => `<option value="${o.id}" ${o.id === x.lote.unidad ? 'selected' : ''}>${o.n}</option>`).join('')}</select></label>
-          <label class="f">Múltiplo de pedido${num('mult', x.lote.multiplo, 1)}</label>
-        </div>
-        <div class="teo" data-teo></div>
-        <div class="acciones" style="margin:0"><button class="btn pri" data-guardar-est="${id}">💾 Guardar parámetros</button><button class="btn" data-aplicar="${id}" type="button">Aplicar a SS y PP</button></div>
-        <details class="vigente"><summary>Valores vigentes (en días de consumo)</summary>
-        ${['SS', 'PP'].map(k => `<div class="stepper-fila"><div class="l">${k === 'SS' ? '🛡️ Stock de seguridad' : '🛒 Punto de pedido'}<small>días de consumo</small></div>
-          <div class="stepper"><button type="button" data-paso="-1" data-k="${k}">−</button><input type="number" min="1" step="1" value="${k === 'SS' ? x.diasSS : x.diasPP}" data-k="${k}"><button type="button" data-paso="1" data-k="${k}">+</button></div></div>`).join('')}
-        <div class="calc"><div><span>SS</span><b data-o="SS">${fmt(x.ss)}</b></div><div><span>PP</span><b data-o="PP">${fmt(x.pp)}</b></div><div><span>Stock</span><b>${fmt(x.stock)}</b></div></div>
-        <button class="btn" data-guardar="${id}">💾 Guardar días vigentes</button></details></div>`;
-    }).join('')}</div>`;
-  $('adm').querySelectorAll('.param').forEach(card => {
-    const id = card.dataset.id, x = M[id], I = INSUMOS[id];
-    const E = k => { const v = card.querySelector(`[data-e="${k}"]`).value; return v === '' ? null : +v; };
-    const U = () => card.querySelector('[data-e="unidad"]').value;
-    const D = k => card.querySelector(`input[data-k="${k}"]`);
-    let T = null;
-    const recalc = () => {
-      ['SS', 'PP'].forEach(k => { card.querySelector(`[data-o="${k}"]`).textContent = x.medio ? fmt(Math.ceil((+D(k).value || 0) * x.medio)) : '—'; });
-    };
-    const teo = () => {
-      T = teorico(x.medio, x.sigma, E('ltN'), E('ltMax'), E('nivel'), E('ciclo'), x.stock, E('max'));
-      const box = card.querySelector('[data-teo]');
-      if (!T) { box.innerHTML = '<p class="nota">Completá lead time normal y máximo (máximo ≥ normal), nivel de servicio entre 50 y 99,99 % y ciclo de pedido para ver el cálculo.</p>'; return; }
-      const f = v => fmt(Math.ceil(v));
-      const bajo = x.stock !== null && x.stock <= T.pp;
-      const R = redondearPedido(id, bajo ? T.pedir : Math.max(0, T.maxN - T.pp), U(), E('mult'));
-      const vs = (t, v) => v === null || v === undefined ? '' : `<small>vigente ${fmt(v)}</small>`;
-      box.innerHTML = `<div class="teo-g">
-        <div><span>z (${fmt(E('nivel'), 1)} %)</span><b>${fmt(T.z, 2)}</b></div>
-        <div><span>SS teórico</span><b>${f(T.ss)}</b>${vs('', x.ss)}<small>${fmt(T.diasSS, 1)} días</small></div>
-        <div><span>PP teórico</span><b>${f(T.pp)}</b>${vs('', x.pp)}<small>${fmt(T.diasPP, 1)} días</small></div>
-        <div><span>Stock máximo ${T.maxDef ? '(definido)' : '(teórico)'}</span><b>${f(T.maxN)}</b><small>${T.maxDef ? 'teórico ' + f(T.maxT) + ' ' + I.u : I.u}</small></div>
-        <div class="dest ${bajo ? 'bad' : 'ok'}"><span>Pedir ${bajo ? 'hoy' : 'al llegar al PP'}</span><b>${R.txt}</b><small>${R.o && R.o.f !== 1 ? '≈ ' + fmt(R.base) + ' ' + I.u + ' · ' : ''}${bajo ? 'stock en o bajo el PP: pedir ya' : 'stock sobre el PP'} · necesidad exacta ${f(bajo ? T.pedir : Math.max(0, T.maxN - T.pp))} ${I.u}, redondeada a múltiplos de ${fmt(E('mult') || 1)} ${R.o ? R.o.n : ''}</small></div></div>
-        <p class="nota">Protección por variabilidad ${f(T.ssVar)} + protección por demora máxima ${f(T.ssDem)} ${I.u}. Stock actual ${fmt(x.stock)} ${I.u}.</p>`;
-    };
-    card.querySelectorAll('[data-paso]').forEach(b => { b.onclick = () => { const inp = D(b.dataset.k); inp.value = Math.max(1, (+inp.value || 0) + +b.dataset.paso); recalc(); }; });
-    card.querySelectorAll('[data-k]').forEach(i => { i.oninput = recalc; });
-    card.querySelectorAll('[data-e]').forEach(i => { i.oninput = teo; i.onchange = teo; });
-    teo();
-    card.querySelector('[data-aplicar]').onclick = () => {
-      if (!T) { toast('Completá primero los parámetros del cálculo', 'warn'); return; }
-      D('SS').value = Math.max(1, Math.ceil(T.diasSS)); D('PP').value = Math.max(Math.ceil(T.diasSS), Math.ceil(T.diasPP));
-      recalc(); card.querySelector('details').open = true;
-      toast('Valores aplicados: guardalos con «Guardar días vigentes»', 'ok');
-    };
-    card.querySelector('[data-guardar-est]').onclick = async ev => {
-      const b = ev.currentTarget;
-      if (E('ltN') === null || E('ltMax') === null || E('nivel') === null || E('ciclo') === null) { toast('Completá lead times, nivel de servicio y ciclo', 'warn'); return; }
-      b.disabled = true;
-      guardando(true, 'Guardando parámetros…');
-      try {
-        toast(await apiPost({ accion: 'parametros', insumo: id, ltNormal: E('ltN'), ltMax: E('ltMax'), nivelServicio: E('nivel'), ciclo: E('ciclo'), stockMax: E('max') === null ? '' : E('max'), unidadPedido: U(), multiplo: E('mult') === null ? '' : E('mult') }), 'ok');
-        await cargar(true);
-      } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
-    };
-    card.querySelector('[data-guardar]').onclick = async ev => {
-      const b = ev.currentTarget;
-      b.disabled = true;
-      guardando(true, 'Guardando parámetros…');
-      try {
-        toast(await apiPost({ accion: 'parametros', insumo: id, diasSS: +D('SS').value, diasPP: +D('PP').value }), 'ok');
-        await cargar(true);
-      } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
-    };
+  const id = ORDEN.indexOf(ST.repIns) >= 0 ? ST.repIns : ORDEN[0];
+  ST.repIns = id;
+  const x = M[id], I = INSUMOS[id], e = x.est;
+  ST.repUni = ST.repUni || {};
+  const uopc = [{ id: 'dias', n: 'días de consumo', f: null }].concat(unidadesPedido(id));
+  const uSel = uopc.find(o => o.id === ST.repUni[id]) || uopc[0];
+  const medio = x.medio;
+  const aU = v => v === null || v === undefined ? null : (uSel.f === null ? (medio ? v / medio : null) : v / uSel.f);
+  const deU = v => v === null || v === undefined || v === '' ? null : (uSel.f === null ? (medio ? v * medio : null) : v * uSel.f);
+  const uTxt = uSel.f === null ? 'días' : uSel.n;
+  const dU = uSel.f === null ? 1 : (uSel.f === 1 ? I.dec : 1);
+  const val = v => { const r = aU(v); return r === null ? '' : Math.round(r * 100) / 100; };
+  const num = (k, v, st, extra) => `<input type="number" min="0" step="${st}" value="${v === null || v === undefined ? '' : v}" data-r="${k}" inputmode="decimal"${extra || ''}>`;
+  const pol = x.politica;
+  $('adm').innerHTML = `
+    <div class="rep-top">
+      <div class="seg" id="segRep">${ORDEN.map(k => `<button data-k="${k}" class="${k === id ? 'on' : ''}">${INSUMOS[k].nombre}</button>`).join('')}</div>
+      <label class="f rep-uni">Ver y cargar cantidades en<select id="repUni">${uopc.map(o => `<option value="${o.id}" ${o.id === uSel.id ? 'selected' : ''}>${o.n}</option>`).join('')}</select></label>
+    </div>
+    <div class="rep-grid" style="--c:var(--c-${id});--c2:var(--c-${id}-2)">
+      <div class="rep-col">
+        <section class="card rep-paso"><h3><span class="n">1</span> Situación actual</h3>
+          <div class="calc c4"><div><span>Stock</span><b>${fmt(aU(x.stock), dU)}</b><small>${uTxt}</small></div><div><span>Consumo medio</span><b>${fmt(medio, I.dec)}</b><small>${I.u}/día</small></div><div><span>σ diaria</span><b>${fmt(x.sigma, I.dec)}</b><small>${I.u}/día</small></div><div><span>Cobertura</span><b>${fmt(x.cobertura, 1)}</b><small>días</small></div></div>
+          <p class="nota">Consumo medio y σ de los últimos ${I.medio.dias} días (${I.medio.metodo === 'mediana' ? 'días con consumo' : 'todos los días'}).</p></section>
+        <section class="card rep-paso"><h3><span class="n">2</span> Abastecimiento</h3>
+          <div class="est-grid">
+            <label class="f">Lead time normal (días)${num('ltN', e.ltN, 0.5)}</label>
+            <label class="f">Lead time máximo (días)${num('ltMax', e.ltMax, 0.5)}</label>
+            <label class="f">Nivel de servicio (%)${num('nivel', e.nivel, 0.1)}</label>
+            <label class="f">Ciclo entre pedidos (días)${num('ciclo', e.ciclo, 1)}</label>
+          </div>
+          <details class="formula"><summary>¿Cómo se calcula?</summary><p class="nota">z = inversa de la normal del nivel de servicio · SS = z·σ·√LT + consumo·(LT máx − LT) · PP = consumo·LT + SS · Stock máximo teórico = PP + consumo·ciclo.</p></details></section>
+        <section class="card rep-paso"><h3><span class="n">3</span> Política de pedido</h3>
+          <div class="radio-fila"><label><input type="radio" name="tipoP" value="max" ${pol.tipo !== 'fijo' ? 'checked' : ''}> Completar hasta un stock máximo</label><label><input type="radio" name="tipoP" value="fijo" ${pol.tipo === 'fijo' ? 'checked' : ''}> Cantidad fija por pedido</label></div>
+          <div class="est-grid">
+            <label class="f" data-ver="max">Stock máximo (${uTxt}) · vacío = teórico${num('max', val(x.stockMax), 'any')}</label>
+            <label class="f" data-ver="fijo">Cantidad fija (${uTxt})${num('fija', val(pol.fija), 'any')}</label>
+            <label class="f">Pedir en<select data-r="unidad">${unidadesPedido(id).map(o => `<option value="${o.id}" ${o.id === x.lote.unidad ? 'selected' : ''}>${o.n}</option>`).join('')}</select></label>
+            <label class="f">Múltiplo de pedido${num('mult', x.lote.multiplo, 'any')}</label>
+          </div></section>
+      </div>
+      <div class="rep-col">
+        <section class="card rep-paso"><h3><span class="n">4</span> Resultado</h3>
+          <div id="repRes"></div></section>
+        <section class="card rep-paso"><h3><span class="n">5</span> Valores vigentes</h3>
+          <p class="nota" style="margin-top:0">Son los que usan el semáforo, los informes y las alertas por mail.</p>
+          <div class="est-grid">
+            <label class="f">Stock de seguridad (${uTxt})${num('ss', val(x.ss), 'any')}</label>
+            <label class="f">Punto de pedido (${uTxt})${num('pp', val(x.pp), 'any')}</label>
+          </div>
+          <div class="acciones" style="margin:12px 0 0"><button class="btn" id="repAplicar" type="button">Usar valores teóricos</button><button class="btn pri" id="repGuardar" type="button">💾 Guardar cambios</button></div></section>
+      </div>
+    </div>`;
+  $('segRep').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.repIns = b.dataset.k; vistaReposicion(); }; });
+  requestAnimationFrame(() => moverPill($('segRep')));
+  $('repUni').onchange = ev => { ST.repUni[id] = ev.target.value; vistaReposicion(); };
+  const R = k => { const el = $('adm').querySelector(`[data-r="${k}"]`); const v = el.value; return v === '' ? null : +v; };
+  const tipo = () => $('adm').querySelector('input[name="tipoP"]:checked').value;
+  const unidad = () => $('adm').querySelector('[data-r="unidad"]').value;
+  let T = null;
+  const calc = () => {
+    $('adm').querySelectorAll('[data-ver]').forEach(el => { el.style.display = el.dataset.ver === tipo() ? '' : 'none'; });
+    T = teorico(medio, x.sigma, R('ltN'), R('ltMax'), R('nivel'), R('ciclo'), x.stock, deU(R('max')));
+    const ssV = deU(R('ss')), ppV = deU(R('pp')), maxU = deU(R('max')), fija = deU(R('fija'));
+    const maxV = maxU || (ppV !== null && medio ? ppV + medio * (R('ciclo') || 7) : null);
+    const cell = v => v === null || v === undefined || !isFinite(v) ? '—' : fmt(aU(v), dU);
+    const pedT = T ? cantidadPedido(id, x, T.pp, T.maxN, T.pp, tipo(), fija, unidad(), R('mult')) : null;
+    const pedV = cantidadPedido(id, x, ppV, maxV, ppV, tipo(), fija, unidad(), R('mult'));
+    const hoyP = cantidadPedido(id, x, ppV, maxV, x.stock, tipo(), fija, unidad(), R('mult'));
+    const bajo = hoyP && hoyP.bajoPP;
+    const pr = proyeccion(x.stock, medio, x.sigma, R('ltN') || 7, R('nivel') || 95);
+    const pedTxt = r => r ? `${r.txt}${r.o && r.o.f !== 1 ? `<small>≈ ${fmt(r.base)} ${I.u}</small>` : ''}` : '—';
+    $('repRes').innerHTML = `
+      <div class="tw"><table class="rep-tabla"><thead><tr><th></th><th class="n">Teórico</th><th class="n">Vigente</th></tr></thead><tbody>
+        <tr><td>🛡️ Stock de seguridad</td><td class="n">${T ? cell(T.ss) : '—'}</td><td class="n">${cell(ssV)}</td></tr>
+        <tr><td>🛒 Punto de pedido</td><td class="n">${T ? cell(T.pp) : '—'}</td><td class="n">${cell(ppV)}</td></tr>
+        ${tipo() === 'max' ? `<tr><td>📦 Stock máximo</td><td class="n">${T ? cell(T.maxT) : '—'}</td><td class="n">${cell(maxV)}${maxU ? '' : ' <small>(PP + ciclo)</small>'}</td></tr>` : `<tr><td>📦 Cantidad fija</td><td class="n">—</td><td class="n">${cell(fija)}</td></tr>`}
+        <tr><td>🧾 Pedido al llegar al PP</td><td class="n">${pedTxt(pedT)}</td><td class="n">${pedTxt(pedV)}</td></tr>
+      </tbody></table></div>
+      <p class="nota">Cantidades en ${uTxt}. ${T ? `z = ${fmt(T.z, 2)} · SS = ${fmt(T.ssVar)} por variabilidad + ${fmt(T.ssDem)} por demora máxima (${I.u}).` : 'Completá el paso 2 para ver los valores teóricos.'}</p>
+      <div class="rep-dest ${bajo ? 'bad' : 'ok'}">
+        <div><span>${bajo ? 'Pedir hoy' : 'Próximo pedido'}</span><b>${hoyP ? (bajo ? hoyP.txt : pedTxt(pedV)) : '—'}</b><small>${hoyP ? (bajo ? 'El stock está en o bajo el punto de pedido.' : `Cuando el stock baje a ${cell(ppV)} ${uTxt}.`) : 'Definí el punto de pedido vigente.'}</small></div>
+        <div><span>Stock alcanza</span><b>${pr ? fmt(pr.diasEsperados, 1) + ' días' : '—'}</b><small>${pr ? `${fmt(pr.diasPesimista, 1)} días con ${fmt(R('nivel') || 95, 1)} % de confianza` : ''}</small></div>
+        <div><span>Riesgo de quiebre</span><b>${pr ? pct(pr.probQuiebre) : '—'}</b><small>${pr ? `en ${fmt(pr.horizonte, 1)} días ${R('ltN') ? '(lead time)' : '(sin lead time cargado)'} sin reponer` : ''}</small></div>
+      </div>`;
+  };
+  $('adm').querySelectorAll('[data-r], input[name="tipoP"]').forEach(el => { el.oninput = calc; el.onchange = calc; });
+  calc();
+  $('repAplicar').onclick = () => {
+    if (!T) { toast('Completá primero el paso 2 (abastecimiento)', 'warn'); return; }
+    const r2 = v => Math.round(aU(v) * 100) / 100;
+    $('adm').querySelector('[data-r="ss"]').value = r2(Math.ceil(T.ss));
+    $('adm').querySelector('[data-r="pp"]').value = r2(Math.ceil(T.pp));
+    calc();
+    toast('Valores teóricos cargados. Revisalos y tocá «Guardar cambios».', 'ok');
+  };
+  $('repGuardar').onclick = async ev => {
+    const b = ev.currentTarget;
+    const sinCambio = k => { const el = $('adm').querySelector(`[data-r="${k}"]`); return el.value === el.defaultValue; };
+    const ssB = sinCambio('ss') && x.ss !== null ? x.diasSS * medio : deU(R('ss')), ppB = sinCambio('pp') && x.pp !== null ? x.diasPP * medio : deU(R('pp'));
+    if (!medio) { toast('Sin consumo medio no se pueden convertir los valores', 'bad'); return; }
+    if (!(ssB > 0) || !(ppB > 0)) { toast('Completá stock de seguridad y punto de pedido', 'warn'); return; }
+    if (ppB < ssB) { toast('El punto de pedido debe ser mayor o igual al stock de seguridad', 'warn'); return; }
+    if (tipo() === 'fijo' && !(deU(R('fija')) > 0)) { toast('Indicá la cantidad fija por pedido', 'warn'); return; }
+    const est = ['ltN', 'ltMax', 'nivel', 'ciclo'].map(R);
+    if (est[2] === null) est[2] = 95;
+    if (est[3] === null) est[3] = 7;
+    const estOk = est[0] !== null && est[1] !== null;
+    if (!estOk && (est[0] !== null || est[1] !== null)) { toast('Completá lead time normal y máximo, o dejá los dos vacíos', 'warn'); return; }
+    if (estOk && est[1] < est[0]) { toast('El lead time máximo debe ser mayor o igual al normal', 'warn'); return; }
+    const body = { accion: 'parametros', insumo: id, diasSS: sinCambio('ss') ? x.diasSS : Math.round(100 * ssB / medio) / 100, diasPP: sinCambio('pp') ? x.diasPP : Math.round(100 * ppB / medio) / 100, stockMax: sinCambio('max') ? (x.stockMax || '') : (deU(R('max')) === null ? '' : Math.round(deU(R('max')) * 100) / 100), unidadPedido: unidad(), multiplo: R('mult') === null ? '' : R('mult'), tipoPedido: tipo(), cantFija: sinCambio('fija') ? (x.politica.fija || '') : (deU(R('fija')) === null ? '' : Math.round(deU(R('fija')) * 100) / 100) };
+    if (estOk) Object.assign(body, { ltNormal: est[0], ltMax: est[1], nivelServicio: est[2], ciclo: est[3] });
+    b.disabled = true;
+    guardando(true, 'Guardando parámetros…');
+    try { toast(await apiPost(body), 'ok'); await cargar(true); } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
+  };
+}
+
+async function vistaMails() {
+  $('adm').innerHTML = '<div class="card"><div class="empty"><span class="spin"></span> Cargando configuración de mails…</div></div>';
+  try { ST.mails = (await apiPost({ accion: 'mailCfg' })).info; } catch (err) { $('adm').innerHTML = `<div class="card"><div class="empty">${esc(err.message)}</div></div>`; return; }
+  pintarMails();
+}
+
+function pintarMails() {
+  const info = ST.mails, c = info.cfg;
+  const DS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const hs = sel => Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === sel ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
+  const ult = k => info.ult && info.ult[k] ? fFecha(info.ult[k]) : 'nunca';
+  const fila = (d, i) => `<tr data-i="${i}"><td><input data-d="nombre" value="${esc(d.nombre)}" placeholder="Nombre"></td><td><input data-d="email" type="email" value="${esc(d.email)}" placeholder="correo@empresa.com"></td>
+    ${['semanal', 'pp', 'ss', 'activo'].map(k => `<td class="c"><input type="checkbox" data-d="${k}" ${d[k] ? 'checked' : ''}></td>`).join('')}<td><button class="btn sm dan" data-quitar="${i}" type="button" aria-label="Quitar">✕</button></td></tr>`;
+  $('adm').innerHTML = `
+    <div class="grid g2">
+      <div class="card"><div class="card-h"><div class="t"><h3>📅 Resumen semanal</h3><span class="sub">Stock al día, consumo semanal, variación y rendimiento · último envío: ${ult('semanal')}</span></div></div>
+        <label class="switch-fila"><input type="checkbox" id="mSemAct" ${c.semanal.activo ? 'checked' : ''}> Enviar automáticamente</label>
+        <div class="est-grid"><label class="f">Día<select id="mSemDia">${DS.map((n, i) => `<option value="${i}" ${i === c.semanal.dia ? 'selected' : ''}>${n}</option>`).join('')}</select></label><label class="f">Hora<select id="mSemHora">${hs(c.semanal.hora)}</select></label></div></div>
+      <div class="card"><div class="card-h"><div class="t"><h3>🚨 Alertas de punto de pedido y stock de seguridad</h3><span class="sub">Se revisa una vez por día elegido · último control: ${ult('alertas')}</span></div></div>
+        <label class="switch-fila"><input type="checkbox" id="mAlAct" ${c.alertas.activo ? 'checked' : ''}> Enviar automáticamente</label>
+        <div class="dias-chk">${DS.map((n, i) => `<label><input type="checkbox" data-dia="${i}" ${c.alertas.dias.indexOf(i) >= 0 ? 'checked' : ''}> ${n.slice(0, 3)}</label>`).join('')}</div>
+        <div class="est-grid"><label class="f">Hora<select id="mAlHora">${hs(c.alertas.hora)}</select></label>
+          <label class="f">Repetir cada (días) · 0 = solo al cruzar<input type="number" id="mAlRep" min="0" max="30" step="1" value="${c.alertas.repetir}"></label>
+          <label class="f full">Horizonte de proyección (días) · 0 = lead time de cada insumo<input type="number" id="mAlHor" min="0" max="90" step="1" value="${c.alertas.horizonte}"></label></div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><div class="card-h"><div class="t"><h3>👥 Destinatarios</h3><span class="sub">Marcá qué mails recibe cada persona.</span></div><button class="btn" id="mAgregar" type="button">➕ Agregar</button></div>
+      <div class="tw"><table class="tabla-mails"><thead><tr><th>Nombre</th><th>Correo</th><th class="c">Semanal</th><th class="c">Alerta PP</th><th class="c">Alerta SS</th><th class="c">Activo</th><th></th></tr></thead>
+      <tbody id="mDest">${c.destinatarios.map(fila).join('') || ''}</tbody></table></div>
+      ${c.destinatarios.length ? '' : '<p class="nota">Todavía no hay destinatarios.</p>'}
+      <label class="f" style="margin-top:12px">Enlace de la aplicación (botón «Abrir la aplicación» del mail)<input id="mUrl" type="url" value="${esc(c.urlApp)}" placeholder="https://…"></label>
+      <div class="acciones"><button class="btn pri" id="mGuardar" type="button">💾 Guardar configuración</button></div></div>
+    <div class="card" style="margin-top:14px"><div class="card-h"><div class="t"><h3>🧪 Enviar prueba</h3><span class="sub">Envía ahora un ejemplo con los datos actuales. Mails disponibles hoy: ${info.cuota === null ? '—' : fmt(info.cuota)}${info.activador ? '' : ' · ⚠️ activador horario no instalado: ejecutá «instalar» en Apps Script'}</span></div></div>
+      <div class="est-grid"><label class="f">Tipo<select id="mPTipo"><option value="semanal">Resumen semanal</option><option value="pp">Alerta punto de pedido</option><option value="ss">Alerta stock de seguridad</option></select></label>
+      <label class="f">Enviar a<input id="mPMail" type="email" placeholder="correo@empresa.com" value="${esc((c.destinatarios[0] || {}).email || '')}"></label></div>
+      <div class="acciones"><button class="btn" id="mProbar" type="button">📨 Enviar prueba</button></div></div>`;
+  const leer = () => ({
+    urlApp: $('mUrl').value.trim(),
+    semanal: { activo: $('mSemAct').checked, dia: +$('mSemDia').value, hora: +$('mSemHora').value },
+    alertas: { activo: $('mAlAct').checked, dias: Array.from($('adm').querySelectorAll('[data-dia]:checked')).map(i => +i.dataset.dia), hora: +$('mAlHora').value, repetir: +$('mAlRep').value || 0, horizonte: +$('mAlHor').value || 0 },
+    destinatarios: Array.from($('mDest').querySelectorAll('tr')).map(tr => { const g = k => tr.querySelector(`[data-d="${k}"]`); return { nombre: g('nombre').value.trim(), email: g('email').value.trim(), semanal: g('semanal').checked, pp: g('pp').checked, ss: g('ss').checked, activo: g('activo').checked }; })
   });
+  $('mAgregar').onclick = () => { ST.mails.cfg = leer(); ST.mails.cfg.destinatarios.push({ nombre: '', email: '', semanal: true, pp: true, ss: true, activo: true }); pintarMails(); };
+  $('adm').querySelectorAll('[data-quitar]').forEach(b => { b.onclick = () => { ST.mails.cfg = leer(); ST.mails.cfg.destinatarios.splice(+b.dataset.quitar, 1); pintarMails(); }; });
+  $('mGuardar').onclick = async ev => {
+    const b = ev.currentTarget;
+    b.disabled = true;
+    guardando(true, 'Guardando configuración…');
+    try { toast(await apiPost({ accion: 'guardarMailCfg', cfg: leer() }), 'ok'); guardando(false); await vistaMails(); } catch (err) { toast(err.message, 'bad'); b.disabled = false; } finally { guardando(false); }
+  };
+  $('mProbar').onclick = async ev => {
+    const b = ev.currentTarget;
+    b.disabled = true;
+    guardando(true, 'Enviando prueba…');
+    try { toast(await apiPost({ accion: 'mailPrueba', tipo: $('mPTipo').value, email: $('mPMail').value.trim() }), 'ok'); } catch (err) { toast(err.message, 'bad'); } finally { guardando(false); b.disabled = false; }
+  };
 }
 
 function vistaAvisar() {
@@ -1204,7 +1299,7 @@ function vistaAdmin() {
     <div id="adm"></div></section>`;
   $('segAdm').querySelectorAll('button').forEach(b => { b.onclick = () => { ST.admSec = b.dataset.sec; vistaAdmin(); }; });
   requestAnimationFrame(() => moverPill($('segAdm')));
-  const v = { registrar: vistaRegistrar, avisar: vistaAvisar, avisos: vistaAvisos, reposicion: vistaReposicion, usuarios: vistaUsuarios, conexion: vistaConexion, cuenta: vistaCuenta }[ST.admSec];
+  const v = { registrar: vistaRegistrar, mails: vistaMails, avisar: vistaAvisar, avisos: vistaAvisos, reposicion: vistaReposicion, usuarios: vistaUsuarios, conexion: vistaConexion, cuenta: vistaCuenta }[ST.admSec];
   v();
 }
 
@@ -1442,14 +1537,14 @@ function informeInsumo(id, pid, pre) {
   const kc = p.cmp ? kpis(id, P[p.cmp]) : null, kc2 = p.cmp2 ? kpis(id, P[p.cmp2]) : null;
   const d1 = compara(k, kc), d2 = compara(k, kc2);
   const vi = verInventario();
-  const ult = (x.movs || []).filter(m => m.tipo === 'Ingreso' || m.tipo === 'Carga cisterna').slice(-1)[0];
+  const ult = (x.movs || []).filter(m => (m.tipo === 'Ingreso' && m.cant > 0) || m.tipo === 'Carga cisterna').slice(-1)[0];
   const ctrl = ultimoControl(x);
   const varTxt = [d1 !== null ? `<span class="${dClase(d1)}">${delta(d1)}</span> vs. ${esc(P[p.cmp].nombre)}` : '', d2 !== null ? `<span class="${dClase(d2)}">${delta(d2)}</span> vs. ${esc(P[p.cmp2].nombre)}` : ''].filter(Boolean).join(' · ');
   const ks = [
     infKpi(`Consumo diario [${u}/día]`, fmt(k.lDia, dec), varTxt || 'Consumo ÷ días calendario'),
     infKpi(`Por día operativo [${u}/día]`, fmt(k.lDiaOp, dec), `${fmt(k.diasConsumo)} días con consumo`),
     infKpi(`Consumo total [${u}]`, fmt(k.cons), `Pico ${fmt(k.pico, dec)}${k.fechaPico ? ' (' + fFecha(k.fechaPico).slice(0, 5) + ')' : ''}`),
-    infKpi(`Ingresos [${u}]`, fmt(k.ingTotal), `${fmt(k.entregas)} entregas`),
+    infKpi(`Ingresos netos [${u}]`, fmt(k.ingTotal), `${fmt(k.entregas)} entregas${k.ingDevuelto ? ' · ' + fmt(k.ingDevuelto, dec) + ' devuelto' : ''}`),
     infKpi(`Stock promedio [${u}]`, fmt(k.stockProm), `Cobertura promedio ${fmt(k.coberturaProm, 1)} días · mín. ${fmt(k.stockMin)}`),
     infKpi('Días bajo SS', fmt(k.diasBajoSS), `de ${fmt(k.diasConStock)} días`, k.diasBajoSS > 0 ? 'bad' : '')
   ];
@@ -1480,7 +1575,7 @@ function informeInsumo(id, pid, pre) {
       <h3 class="inf-h">1 · Estado actual</h3>
       <div class="inf-est-1 ${x.estado}" style="--c:var(--c-${id});--c2:var(--c-${id}-2)">${ilus(id, x.stock, x)}
         <div><div class="inf-nom">${I.ico} ${I.nombre} · ${I.desc}</div><div class="inf-stock">${fmt(x.stock)} <small>${u}</small>${id === 'stretch' && x.ultimo ? ` <small>(≈ ${fmt(x.ultimo.stockBob)} bobinas)</small>` : ''}</div><div class="inf-cob">⏳ ${fmt(x.cobertura, 1)} días de cobertura · <span class="est-tag tag">${ESTADO[x.estado]}</span></div></div>
-        <dl><dt>Consumo medio</dt><dd>${fmt(x.medio, dec)} ${u}/día</dd><dt>Punto de pedido (${x.diasPP} d)</dt><dd>${fmt(x.pp)} ${u}</dd><dt>Stock de seguridad (${x.diasSS} d)</dt><dd>${fmt(x.ss)} ${u}</dd><dt>Último ingreso</dt><dd>${ult ? fFecha(ult.f) + ' · ' + fmt(ult.cant) + ' ' + u : '—'}</dd><dt>Último control</dt><dd>${ctrl ? fFecha(ctrl.f) : '—'}</dd></dl></div>
+        <dl><dt>Consumo medio</dt><dd>${fmt(x.medio, dec)} ${u}/día</dd><dt>Punto de pedido (${x.diasPP} d)</dt><dd>${fmt(x.pp)} ${u}</dd><dt>Stock de seguridad (${x.diasSS} d)</dt><dd>${fmt(x.ss)} ${u}</dd><dt>Último ingreso</dt><dd>${ult ? fFecha(ult.f) + ' · ' + fmt(ult.neto !== undefined ? ult.neto : ult.cant) + ' ' + u + (ult.devuelto ? ' (recibido ' + fmt(ult.cant) + ', devuelto ' + fmt(ult.devuelto) + ')' : '') : '—'}</dd><dt>Último control</dt><dd>${ctrl ? fFecha(ctrl.f) : '—'}</dd></dl></div>
       <h3 class="inf-h">2 · Indicadores del período</h3><div class="inf-kpis">${ks.join('')}</div>
       <div class="inf-sec"><h3 class="inf-h">3 · Stock y consumo</h3><div class="inf-2"><div><h4>Evolución del stock [${u}]</h4><div class="inf-chart medio"><canvas id="${pre}-st"></canvas></div></div><div><h4>Consumo diario por mes [${u}/día]</h4><div class="inf-chart medio"><canvas id="${pre}-men"></canvas></div></div></div></div>
       <h3 class="inf-h">4 · Comparativa de períodos</h3>${tablaComparativa(id)}

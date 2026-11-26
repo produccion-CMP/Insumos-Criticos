@@ -144,6 +144,8 @@ function construirModelo(D) {
     const uopc = unidadesPedido(id);
     const ud = uopc.find(o => o.id === (nec && nec.unidadPedido)) || uopc.find(o => o.def) || uopc[0];
     ins.lote = { unidad: ud.id, multiplo: nec && nec.multiplo ? nec.multiplo : ud.mult };
+    ins.politica = { tipo: nec && nec.tipoPedido === 'fijo' ? 'fijo' : 'max', fija: nec && nec.cantFija ? nec.cantFija : null };
+    if (id !== 'gasoil') ingresosNetos(ins.movs);
     ins.est = { ltN: nec && nec.ltNormal ? nec.ltNormal : null, ltMax: nec && nec.ltMax ? nec.ltMax : null, nivel: nec && nec.nivelServicio ? nec.nivelServicio : 95, ciclo: nec && nec.ciclo ? nec.ciclo : 7, guardado: !!(nec && nec.ltNormal && nec.ltMax) };
     ins.sigma = sigmaConsumo(id, ins, hoy);
     ins.ss = ins.medio !== null ? Math.ceil(ins.diasSS * ins.medio) : null;
@@ -195,6 +197,55 @@ function redondearPedido(id, cant, unidad, multiplo) {
   const m = multiplo > 0 ? multiplo : 1;
   const q = Math.ceil(cant / o.f / m - 1e-9) * m;
   return { base: q * o.f, q, o, txt: fmt(q, q % 1 ? 1 : 0) + ' ' + o.n };
+}
+
+function ingresosNetos(movs) {
+  const ing = movs.filter(m => m.tipo === 'Ingreso' && m.cant > 0).sort((a, b) => (a.f < b.f ? -1 : a.f > b.f ? 1 : 0));
+  ing.forEach(m => { m.neto = m.cant; m.devuelto = 0; });
+  movs.filter(m => m.tipo === 'Devolución').sort((a, b) => (a.f < b.f ? -1 : 1)).forEach(dv => {
+    let resto = -dv.cant;
+    const previos = ing.filter(m => m.f <= dv.f);
+    const mismos = previos.filter(m => dv.prov && m.prov === dv.prov);
+    const orden = (mismos.length ? mismos : previos).slice().reverse();
+    for (let i = 0; i < orden.length && resto > 0; i++) { const q = Math.min(orden[i].neto, resto); orden[i].neto -= q; orden[i].devuelto += q; resto -= q; }
+    dv.sinAsignar = resto;
+  });
+  return ing;
+}
+
+function ingresoNetoPeriodo(ins, a, b) {
+  const l = (ins.movs || []).filter(m => m.tipo === 'Ingreso' && m.cant > 0 && m.f >= a && m.f <= b);
+  return { neto: sumar(l.map(m => m.neto !== undefined ? m.neto : m.cant)), bruto: sumar(l, 'cant'), entregas: l.length, devuelto: sumar(l.map(m => m.devuelto || 0)) };
+}
+
+function factorUnidad(id, unidad) {
+  const o = unidadesPedido(id).find(x => x.id === unidad);
+  return o ? o.f : 1;
+}
+
+function cantidadPedido(id, ins, pp, maxN, stock, tipo, fija, unidad, multiplo) {
+  if (stock === null || stock === undefined || pp === null || pp === undefined) return null;
+  const base = tipo === 'fijo' ? (fija > 0 ? fija : 0) : Math.max(0, (maxN || 0) - stock);
+  const r = redondearPedido(id, base, unidad, multiplo);
+  r.exacto = base;
+  r.bajoPP = stock <= pp;
+  return r;
+}
+
+function normCdf(x) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const y = 1 - 0.3989422804014327 * Math.exp(-x * x / 2) * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? y : 1 - y;
+}
+
+function proyeccion(stock, medio, sigma, horizonte, nivel) {
+  if (stock === null || stock === undefined || !(medio > 0)) return null;
+  const z = zNormal((nivel || 95) / 100) || 1.645;
+  const s = sigma || 0;
+  const x = (-z * s + Math.sqrt(z * z * s * s + 4 * medio * Math.max(stock, 0))) / (2 * medio);
+  const h = horizonte > 0 ? horizonte : 7;
+  const pq = s > 0 ? 1 - normCdf((stock - medio * h) / (s * Math.sqrt(h))) : (stock < medio * h ? 1 : 0);
+  return { diasEsperados: stock / medio, diasPesimista: x * x, horizonte: h, stockFin: stock - medio * h, probQuiebre: 100 * pq, z };
 }
 
 function sigmaConsumo(id, ins, hoy) {
@@ -275,15 +326,16 @@ function kpis(id, p) {
   const stockProm = stocks.length ? sumar(stocks) / stocks.length : null;
   const mv = movsPeriodo(ins, p);
   const ingresos = id === 'gasoil' ? mv.filter(m => m.tipo === 'Carga cisterna') : mv.filter(m => m.tipo === 'Ingreso' || m.tipo === 'Devolución');
-  const ingTotal = id === 'gasoil' ? sumar(ingresos, 'cant') : sumar(s, 'ing');
-  const entregas = ingresos.filter(m => m.cant > 0).length;
+  const ingNet = id === 'gasoil' ? null : ingresoNetoPeriodo(ins, p.a, p.b);
+  const ingTotal = id === 'gasoil' ? sumar(ingresos, 'cant') : ingNet.neto;
+  const entregas = id === 'gasoil' ? ingresos.filter(m => m.cant > 0).length : ingNet.entregas;
   const env = sumar(s, 'env');
   const ctrls = s.filter(r => r.ctrl !== null && r.ctrl !== undefined);
   const ajustes = s.filter(r => r.aj !== null && r.aj !== undefined);
   const k = {
     dias, diasDatos, cons, lDia: diasDatos ? cons / diasDatos : null, lDiaOp: pos.length ? sumar(pos) / pos.length : null,
     diasConsumo: pos.length, p90: percentil(consDias, 0.9), pico: consDias.length ? Math.max.apply(null, consDias) : null,
-    ingTotal, entregas, entregaProm: entregas ? ingTotal / entregas : null, env,
+    ingTotal, ingBruto: ingNet ? ingNet.bruto : ingTotal, ingDevuelto: ingNet ? ingNet.devuelto : 0, entregas, entregaProm: entregas ? ingTotal / entregas : null, env,
     stockProm, stockMin: stocks.length ? Math.min.apply(null, stocks) : null,
     diasBajoSS: ins.ss !== null ? s.filter(r => r.stock !== null && r.stock !== undefined && r.stock < ins.ss).length : null,
     diasConStock: stocks.length,
@@ -355,7 +407,7 @@ function semanal(id, semanas) {
   const dias = dn(fin) - dn(a) + 1;
   if (dias <= 0) return { cons: null, ing: null, dias: 0, a };
   const s = ins.serie.filter(r => r.f >= a && r.f <= fin);
-  const ing = id === 'gasoil' ? sumar(ins.movs.filter(m => m.tipo === 'Carga cisterna' && m.f >= a && m.f <= fin), 'cant') : sumar(s, 'ing');
+  const ing = id === 'gasoil' ? sumar(ins.movs.filter(m => m.tipo === 'Carga cisterna' && m.f >= a && m.f <= fin), 'cant') : ingresoNetoPeriodo(ins, a, fin).neto;
   return { cons: 7 * sumar(s, 'cons') / dias, ing: 7 * ing / dias, dias, a };
 }
 

@@ -141,3 +141,11 @@ En Administración › Reposición, por insumo: consumo medio, σ diaria, lead t
 - Pedido redondeado: unidad de pedido y múltiplo por insumo (Necesidades, columnas N y O). Por defecto: tarimas de a 10 u, stretch por pallet de 69 bobinas, gasoil de a 5.000 L, cal por pallet de 75 bolsas.
 - Informe de stretch: sección 6 «Consumo de stretch por pallet» (promedio, mediana, σ, rango y tabla y gráfico mensual).
 - Cantidades negativas con proveedor = devolución, en tarimas, stretch y cal. La tabla de proveedores separa Ingresado, Devuelto y Neto.
+
+## v11
+
+- **Ingresos netos:** cada devolución se descuenta del último ingreso anterior (del mismo proveedor si existe). El neto nunca supera lo recibido ni queda negativo.
+- **Reposición** en 5 pasos por insumo: situación actual, abastecimiento, política de pedido (hasta stock máximo o cantidad fija), resultado (teórico vs. vigente) y valores vigentes. Las cantidades se ven y cargan en días o en cualquier unidad del insumo. Necesidades, columnas P y Q: tipo de pedido y cantidad fija.
+- **Mails automáticos** (Administración › Mails): resumen semanal (día y hora), alertas de punto de pedido y de stock de seguridad (días, hora, repetición y horizonte), destinatarios con selección por tipo de mail y envío de prueba.
+- Archivos de Apps Script: `Code.gs`, `Modelo.gs` (generado desde datos.js con `python3 tools/build_modelo.py datos.js apps-script/Modelo.gs`), `Mails.gs` y `appsscript.json`, que ahora incluye el permiso para enviar mails.
+- Después de publicar, ejecutar `instalar` una vez: crea el activador horario de mails.

@@ -907,3 +907,29 @@ tr.tenue td { color: var(--faint); font-size: .8rem; }
 .teo-g .dest.bad { border-color: var(--bad); }
 .vigente summary { cursor: pointer; font-size: .8rem; font-weight: 800; color: var(--muted); margin-bottom: 8px; }
 .vigente > * { margin-top: 8px; }
+
+.rep-top { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+.rep-top .rep-uni { width: 240px; }
+.rep-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.rep-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rep-paso h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 1rem; }
+.rep-paso h3 .n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem; background: color-mix(in srgb, var(--c) 22%, transparent); color: var(--text); }
+.calc.c4 { grid-template-columns: repeat(4, 1fr); }
+.radio-fila { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 12px; font-size: .88rem; font-weight: 600; }
+.radio-fila input { width: auto; margin-right: 6px; }
+.formula summary { cursor: pointer; font-size: .8rem; font-weight: 700; color: var(--muted); margin-top: 10px; }
+.rep-tabla td small, .rep-dest small { display: block; color: var(--muted); font-size: .7rem; font-weight: 600; }
+.rep-dest { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+.rep-dest > div { padding: 10px 12px; border-radius: 12px; background: var(--panel-2); display: flex; flex-direction: column; gap: 2px; }
+.rep-dest span { font-size: .7rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.rep-dest b { font-size: 1.15rem; }
+.rep-dest > div:first-child { border: 1.5px solid var(--ok); }
+.rep-dest.bad > div:first-child { border-color: var(--bad); }
+@media (max-width: 900px) { .rep-grid { grid-template-columns: 1fr; } .calc.c4 { grid-template-columns: repeat(2, 1fr); } .rep-dest { grid-template-columns: 1fr; } }
+
+.switch-fila { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; margin: 0 0 12px; }
+.switch-fila input, .dias-chk input, .tabla-mails input[type=checkbox] { width: auto; }
+.dias-chk { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 12px; font-size: .85rem; font-weight: 600; }
+.tabla-mails td { padding: 6px 4px; vertical-align: middle; }
+.tabla-mails td.c, .tabla-mails th.c { text-align: center; }
+.tabla-mails input[type=email], .tabla-mails input:not([type]) { min-width: 140px; }
